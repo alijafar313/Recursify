@@ -11,23 +11,47 @@ class AIScreen extends StatefulWidget {
 }
 
 class _AIScreenState extends State<AIScreen> {
-  // TODO: For production, move this to a backend (Firebase Functions)!
-  static const _hardcodedKey = 'AIzaSyBJc-uNFyifPYUrqG-vg0hKLjDuHMG8gXQ';
-  
   final _apiKeyController = TextEditingController();
   String _result = '';
   bool _isLoading = false;
-  bool _hasKey = true; // Default to true since we have a hardcoded key
+  bool _hasKey = false;
 
   @override
   void initState() {
     super.initState();
-    // We don't need to load from prefs for this prototype anymore
+    _loadKey();
+  }
+
+  Future<void> _loadKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = prefs.getString('gemini_api_key');
+    if (key != null && key.isNotEmpty) {
+      _apiKeyController.text = key;
+      setState(() => _hasKey = true);
+    }
+  }
+
+  Future<void> _saveKey() async {
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gemini_api_key', key);
+    setState(() => _hasKey = true);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('API Key Saved!')),
+    );
   }
 
   Future<void> _analyze() async {
-    // Use hardcoded key
-    const key = _hardcodedKey;
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an API Key first.')),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -62,8 +86,6 @@ class _AIScreenState extends State<AIScreen> {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              // Toggle key input visibility logic could go here
-              // For now we just show it at top
               setState(() => _hasKey = false);
             },
           )
@@ -74,8 +96,41 @@ class _AIScreenState extends State<AIScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Input card removed for MVP since key is hardcoded.
-              
+              if (!_hasKey)
+                Card(
+                  color: Colors.blue.shade50,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Setup Gemini API',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('Get a free key from aistudio.google.com'),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _apiKeyController,
+                          decoration: const InputDecoration(
+                            labelText: 'Paste API Key Here',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          obscureText: true,
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _saveKey,
+                          child: const Text('Save Key'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               if (_hasKey && _result.isEmpty && !_isLoading)
                 Expanded(
                   child: Center(
