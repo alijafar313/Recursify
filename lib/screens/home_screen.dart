@@ -10,10 +10,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   List<DateTime> _days = [];
   bool _isLoading = true;
   
@@ -29,6 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _refresh();
+  }
+
+  Future<void> refreshData() async {
+    await _refresh();
   }
 
   Future<void> _refresh() async {

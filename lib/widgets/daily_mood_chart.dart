@@ -135,7 +135,11 @@ class DailyMoodChart extends StatelessWidget {
     List<Color> gradientColors = [Colors.red, Colors.red, Colors.green, Colors.green];
     List<double> gradientStops = [0.0, 0.5, 0.5, 1.0];
 
-    if (maxY <= 0) {
+    if (minY == 0 && maxY == 0) {
+      // Flat line at 0 (Neutral)
+      gradientColors = [Colors.amber, Colors.amber];
+      gradientStops = [0.0, 1.0];
+    } else if (maxY <= 0) {
       // All negative
       gradientColors = [Colors.red, Colors.red];
       gradientStops = [0.0, 1.0];
@@ -293,21 +297,56 @@ class DailyMoodChart extends StatelessWidget {
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  interval: 6, 
+                  interval: 0.1, // Check very frequently to match specific points
                   reservedSize: 22,
                   getTitlesWidget: (value, meta) {
-                    // Filter out bounds if too close to edges? 
-                    // Or just show every 6 hours from 0?
-                    // E.g. 0, 6, 12, 18, 24, 30
-                    
-                    double normalized = value;
-                    while (normalized >= 24) normalized -= 24;
-                    
-                    final dt = DateTime(2022, 1, 1, normalized.toInt(), (normalized % 1 * 60).toInt());
-                    final text = DateFormat('h a').format(dt).toLowerCase(); 
-                    
-                    if (value == 0 || value == 24 || value == 48) return const SizedBox(); // don't show midnight overlapping 0/24 sometimes?
+                    // Logic:
+                    // 1. Is this 'value' equal to (or very close to) Wake Time?
+                    // 2. Is this 'value' equal to (or very close to) Sleep Time?
+                    // 3. Is this 'value' equal to (or very close to) any Data Point X?
+                    // If yes, return Text. Else SizedBox.
 
+                    // We need a small epsilon for float comparison.
+                    const epsilon = 0.05;
+
+                    bool shouldShow = false;
+                    String text = '';
+                    
+                    // Check Start (Wake)
+                    if ((value - finalMinX).abs() < epsilon) {
+                       shouldShow = true;
+                       text = _formatHour(finalMinX);
+                    }
+                    // Check End (Sleep)
+                    else if ((value - finalMaxX).abs() < epsilon) {
+                       shouldShow = true;
+                       text = _formatHour(finalMaxX);
+                    }
+                    // Check Data points
+                    else {
+                      for (final spot in spots) {
+                        if ((value - spot.x).abs() < epsilon) {
+                          shouldShow = true;
+                          text = _formatHour(spot.x);
+                          break;
+                        }
+                      }
+                    }
+
+                    if (!shouldShow) return const SizedBox.shrink();
+
+                    // Optional: Avoid overlapping??
+                    // For now, let's just show them. Overlapping might occur if data is dense.
+                    // fl_chart might not handle overlapping well automatically with this custom logic.
+                    // A simple heuristic: if we just showed a label "close" to this one, skip?
+                    // Hard to track state inside this callback efficiently without side effects.
+                    // But typically fl_chart calls these in order.
+                    
+                    // Optimization: We only want to match exactly ONCE per "point". 
+                    // Since interval is 0.1, we might match multiple times for a point at 9.0 (8.9, 9.0, 9.1).
+                    // We should strictly match the closest interval step.
+                    // Or better: Use 'getTitlesWidget' just to look up if 'value' is IN a "Show List".
+                    
                     return Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
@@ -341,6 +380,13 @@ class DailyMoodChart extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatHour(double value) {
+    double normalized = value;
+    while (normalized >= 24) normalized -= 24;
+    final dt = DateTime(2022, 1, 1, normalized.toInt(), (normalized % 1 * 60).toInt());
+    return DateFormat('h:mm a').format(dt).toLowerCase().replaceAll(':00', ''); // 9 am, 2:30 pm
   }
 }
 

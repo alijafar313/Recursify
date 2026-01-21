@@ -17,13 +17,22 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const SleepScreen(),
-    const GeneralAnalyticsScreen(),
-    const ObservationsScreen(),
-    const AIScreen(),
-  ];
+  // We use a GlobalKey to access HomeScreen state to refresh it
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+  
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+       HomeScreen(key: _homeKey),
+       const SleepScreen(),
+       const GeneralAnalyticsScreen(),
+       const ObservationsScreen(),
+       const AIScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,11 +42,13 @@ class _MainShellState extends State<MainShell> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-               Navigator.push(
+            onPressed: () async {
+               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
+              // Refresh Home when returning from settings (e.g. after seeding data)
+              _homeKey.currentState?.refreshData();
             },
           ),
         ],

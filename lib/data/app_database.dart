@@ -1,5 +1,6 @@
-import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart';
 
 /// AppDatabase is a small helper class that:
 /// 1) Creates / opens a local SQLite database file on the device.
@@ -678,6 +679,98 @@ class AppDatabase {
     
     await db.delete('observation', where: 'deleted_at IS NOT NULL AND deleted_at < ?', whereArgs: [cutoff]);
     await db.delete('problem_solution', where: 'deleted_at IS NOT NULL AND deleted_at < ?', whereArgs: [cutoff]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // DEBUG / SEEDING
+  // ---------------------------------------------------------------------------
+
+  static Future<void> seedDebugData() async {
+    final db = await getDb();
+    
+    // Clear existing
+    await db.delete('snapshot');
+    await db.delete('day_schedule');
+    await db.delete('problem_solution');
+    await db.delete('observation');
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Day 0: Normal "Good" Day (06:00 - 23:00) - curve up then stable
+    // 7AM: 0 (Neutral)
+    // 10AM: 2 (Good)
+    // 2PM: 4 (Great)
+    // 6PM: 3 (Good)
+    // 10PM: 1 (Okay)
+    await _insertSnap(db, today, 7, 0, 0);
+    await _insertSnap(db, today, 10, 0, 2);
+    await _insertSnap(db, today, 14, 0, 4);
+    await _insertSnap(db, today, 18, 0, 3);
+    await _insertSnap(db, today, 22, 0, 1);
+
+    // Day -1: "Stressful" Day (Zig Zag)
+    final d1 = today.subtract(const Duration(days: 1));
+    await _insertSnap(db, d1, 8, 0, -1);
+    await _insertSnap(db, d1, 11, 30, -3);
+    await _insertSnap(db, d1, 13, 0, 2); // Recovery lunch
+    await _insertSnap(db, d1, 16, 0, -4); // Crash
+    await _insertSnap(db, d1, 20, 0, -2);
+
+    // Day -2: "Early Bird" Test (Data OUTSIDE standard wake time)
+    // Standard Wake is 6AM. We log at 4:30 AM.
+    // Chart should auto-expand left and show grey area if no override.
+    final d2 = today.subtract(const Duration(days: 2));
+    await _insertSnap(db, d2, 4, 30, 3); // Early workout?
+    await _insertSnap(db, d2, 7, 0, 5); 
+    await _insertSnap(db, d2, 12, 0, 2);
+    await _insertSnap(db, d2, 20, 0, 0);
+
+    // Day -3: "Override" Day
+    // User sets schedule: Wake 10:00, Sleep 02:00 (Next day technicaly but simpler to just do 24:00 equivalent)
+    // We will set Override in DB first.
+    final d3 = today.subtract(const Duration(days: 3));
+    // Override: Wake 10:00 (10 AM), Sleep 01:00 (1 AM next day? Let's just say 23:59 for now to keep it simple, or 25?)
+    // The current day logic splits at midnight usually. Let's do 10AM to 11PM range but compressed data.
+    // Actually, let's explicitly set Wake=10, Sleep=23.
+    await db.insert('day_schedule', {
+      'date': DateFormat('yyyy-MM-dd').format(d3),
+      'wake_h': 10, 'wake_m': 0,
+      'sleep_h': 23, 'sleep_m': 0,
+    });
+    // Data points restricted to this or outside? 
+    // Let's put data totally normal, but since wake is 10, a 9AM log should show grey.
+    await _insertSnap(db, d3, 9, 0, -2); // Woke up early, grumpy (Outside schedule)
+    await _insertSnap(db, d3, 11, 0, 1); // inside
+    await _insertSnap(db, d3, 15, 0, 3);
+    await _insertSnap(db, d3, 22, 0, 2);
+
+    // Day -4: "Flat Line"
+    final d4 = today.subtract(const Duration(days: 4));
+    await _insertSnap(db, d4, 8, 0, 0);
+    await _insertSnap(db, d4, 12, 0, 0);
+    await _insertSnap(db, d4, 16, 0, 0);
+    await _insertSnap(db, d4, 20, 0, 0);
+    
+    // Seed some insights
+    await insertObservation('I feel better when I drink water.');
+    await insertProblemSolution('Trouble sleeping', 'Read a book instead of phone');
+    await voteProblemSolution(1, true); // Upvote it once (ID might be different but it's first)
+  }
+
+  static Future<void> _insertSnap(Database db, DateTime date, int h, int m, int intensity) async {
+    // Ensure we have a default problem
+    await db.insert('problem', {'title': 'General'}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    final rows = await db.query('problem', where: 'title = ?', whereArgs: ['General']);
+    final pid = rows.first['id'] as int;
+
+    // Create timestamp
+    final dt = DateTime(date.year, date.month, date.day, h, m);
+    await db.insert('snapshot', {
+      'problem_id': pid,
+      'intensity': intensity,
+      'created_at': dt.millisecondsSinceEpoch,
+    });
   }
 }
 

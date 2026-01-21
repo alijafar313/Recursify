@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
+import '../data/app_database.dart';
 import 'trash_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -239,6 +240,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 context,
                 MaterialPageRoute(builder: (_) => const TrashScreen()),
               );
+            },
+          ),
+          
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.bug_report, color: Colors.purple),
+            title: const Text('Developer: Seed Test Data', style: TextStyle(color: Colors.purple)),
+            subtitle: const Text('Resets DB & adds mock graphs'),
+            onTap: () async {
+              await AppDatabase.seedDebugData();
+              if (mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Database reset and seeded! Restart maybe needed to refresh caching.')),
+                 );
+              }
             },
           ),
 
