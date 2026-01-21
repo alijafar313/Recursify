@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'screens/main_shell.dart';
+import 'services/notification_service.dart';
 
 // ============================================================
 // App entry point
 // ============================================================
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().init();
   runApp(const MoodlyApp());
 }
 

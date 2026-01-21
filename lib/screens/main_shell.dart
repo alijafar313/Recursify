@@ -3,6 +3,9 @@ import 'home_screen.dart';
 import 'sleep_screen.dart';
 import 'general_analytics_screen.dart';
 import 'ai_screen.dart';
+import 'observations_screen.dart';
+
+import 'settings_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -18,12 +21,27 @@ class _MainShellState extends State<MainShell> {
     const HomeScreen(),
     const SleepScreen(),
     const GeneralAnalyticsScreen(),
+    const ObservationsScreen(),
     const AIScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Moodly'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+               Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -44,6 +62,10 @@ class _MainShellState extends State<MainShell> {
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.lightbulb_outline),
+            label: 'Insights',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.psychology), 
