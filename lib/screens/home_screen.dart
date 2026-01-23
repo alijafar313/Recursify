@@ -245,34 +245,77 @@ class _DayCardState extends State<_DayCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              InkWell(
-                onTap: widget.onEditSchedule,
-                child: Row(
-                  children: [
-                    Text(
-                      DateFormat('EEEE, MMM d').format(widget.date),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1e1e1e), // Dark Matte
+            Color(0xFF252525),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: widget.onEditSchedule,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                           Text(
+                            DateFormat('EEEE').format(widget.date).toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                              color: Colors.white.withOpacity(0.5),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat('MMM d').format(widget.date),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.edit_calendar, size: 16, color: Colors.grey[600]),
-                  ],
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.edit, size: 16, color: Colors.white70),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 24),
               SizedBox(
                 height: 300,
                 child: FutureBuilder<List<MoodSnapshot>>(
@@ -298,6 +341,7 @@ class _DayCardState extends State<_DayCard> {
           ),
         ),
       ),
+     ),
     );
   }
 }

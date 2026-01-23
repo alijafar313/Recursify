@@ -137,15 +137,15 @@ class DailyMoodChart extends StatelessWidget {
 
     if (minY == 0 && maxY == 0) {
       // Flat line at 0 (Neutral)
-      gradientColors = [Colors.amber, Colors.amber];
+      gradientColors = [const Color(0xFF08D9D6), const Color(0xFF08D9D6)]; // Neon Cyan
       gradientStops = [0.0, 1.0];
     } else if (maxY <= 0) {
       // All negative
-      gradientColors = [Colors.red, Colors.red];
+      gradientColors = [const Color(0xFFFF2E63), const Color(0xFFFF2E63)];
       gradientStops = [0.0, 1.0];
     } else if (minY >= 0) {
       // All positive
-      gradientColors = [Colors.green, Colors.green];
+      gradientColors = [const Color(0xFF20BF55), const Color(0xFF20BF55)];
       gradientStops = [0.0, 1.0];
     } else {
       // Crossing zero
@@ -156,15 +156,15 @@ class DailyMoodChart extends StatelessWidget {
       // We want a tiny yellow band at zero? Or just hard cut?
       // User said: "zero is neutral, which makes it yellow"
       // Let's add a small band around zeroPos
-      final epsilon = 0.02; // 2% band
+      final epsilon = 0.05; // 5% band around zero
       
       gradientColors = [
-        Colors.red, 
-        Colors.red, 
-        Colors.amber, 
-        Colors.amber, 
-        Colors.green, 
-        Colors.green
+        const Color(0xFFFF2E63), // Neon Red
+        const Color(0xFFFF2E63), 
+        const Color(0xFF08D9D6), // Neon Cyan (Neutral)
+        const Color(0xFF08D9D6), // 
+        const Color(0xFF20BF55), // Neon Green
+        const Color(0xFF20BF55)
       ];
       gradientStops = [
         0.0, 
@@ -180,9 +180,10 @@ class DailyMoodChart extends StatelessWidget {
     final mainBarData = LineChartBarData(
       spots: spots,
       isCurved: true,
-      curveSmoothness: 0.2,
-      barWidth: 3,
+      curveSmoothness: 0.35, // Very smooth
+      barWidth: 5, // Thicker line
       isStrokeCapRound: true,
+      shadow: const Shadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)), // Subtle depth
       
       gradient: LinearGradient(
         colors: gradientColors,
@@ -194,14 +195,16 @@ class DailyMoodChart extends StatelessWidget {
       dotData: FlDotData(
         show: true,
         getDotPainter: (spot, percent, barData, index) {
-           Color dotColor = Colors.amber;
-           if (spot.y > 0) dotColor = Colors.green;
-           if (spot.y < 0) dotColor = Colors.red;
+           Color dotColor = const Color(0xFF08D9D6); // Default Cyan
+           if (spot.y > 0) dotColor = const Color(0xFF20BF55); // Green
+           if (spot.y < 0) dotColor = const Color(0xFFFF2E63); // Red
+           
+           // White center, colored ring
            return FlDotCirclePainter(
-             radius: 4,
-             color: dotColor,
-             strokeWidth: 1,
-             strokeColor: Colors.white,
+             radius: 6,
+             color: Colors.white,
+             strokeWidth: 3,
+             strokeColor: dotColor,
            );
         },
       ),
@@ -209,14 +212,28 @@ class DailyMoodChart extends StatelessWidget {
       // Fill from Line DOWN to 0 (Positive values) -> Green
       belowBarData: BarAreaData(
         show: true,
-        color: Colors.green.withOpacity(0.5),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF20BF55).withOpacity(0.3),
+            const Color(0xFF20BF55).withOpacity(0.0),
+          ],
+        ),
         cutOffY: 0,
         applyCutOffY: true,
       ),
       // Fill from Line UP to 0 (Negative values) -> Red
       aboveBarData: BarAreaData(
         show: true,
-        color: Colors.redAccent.withOpacity(0.5),
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            const Color(0xFFFF2E63).withOpacity(0.3),
+            const Color(0xFFFF2E63).withOpacity(0.0),
+          ],
+        ),
         cutOffY: 0,
         applyCutOffY: true,
       ),
@@ -252,7 +269,7 @@ class DailyMoodChart extends StatelessWidget {
                     return LineTooltipItem(
                       sorted[index].title,
                       const TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 10,
                       ),
@@ -265,12 +282,12 @@ class DailyMoodChart extends StatelessWidget {
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
-              horizontalInterval: 1, // Show lines for every integer
+              horizontalInterval: 1, 
               getDrawingHorizontalLine: (value) {
                 if (value == 0) {
-                  return const FlLine(color: Colors.black, strokeWidth: 1.5);
+                  return const FlLine(color: Colors.white24, strokeWidth: 1); // Subtle zero line
                 }
-                return FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1);
+                return const FlLine(color: Colors.transparent); // Hide others
               },
             ),
 
@@ -282,13 +299,13 @@ class DailyMoodChart extends StatelessWidget {
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  interval: 1, // Every number -5 to 5
+                  interval: 1, 
                   reservedSize: 24,
                   getTitlesWidget: (value, meta) {
                     if (value.abs() == 6) return const SizedBox.shrink();
                     return Text(
                       value.toInt().toString(),
-                      style: const TextStyle(color: Colors.grey, fontSize: 10),
+                      style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold),
                     );
                   },
                 ),
@@ -297,32 +314,23 @@ class DailyMoodChart extends StatelessWidget {
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  interval: 0.1, // Check very frequently to match specific points
+                  interval: 0.1, 
                   reservedSize: 22,
                   getTitlesWidget: (value, meta) {
-                    // Logic:
-                    // 1. Is this 'value' equal to (or very close to) Wake Time?
-                    // 2. Is this 'value' equal to (or very close to) Sleep Time?
-                    // 3. Is this 'value' equal to (or very close to) any Data Point X?
-                    // If yes, return Text. Else SizedBox.
-
-                    // We need a small epsilon for float comparison.
+                    // Logic from before...
                     const epsilon = 0.05;
 
                     bool shouldShow = false;
                     String text = '';
                     
-                    // Check Start (Wake)
                     if ((value - finalMinX).abs() < epsilon) {
                        shouldShow = true;
                        text = _formatHour(finalMinX);
                     }
-                    // Check End (Sleep)
                     else if ((value - finalMaxX).abs() < epsilon) {
                        shouldShow = true;
                        text = _formatHour(finalMaxX);
                     }
-                    // Check Data points
                     else {
                       for (final spot in spots) {
                         if ((value - spot.x).abs() < epsilon) {
@@ -335,26 +343,14 @@ class DailyMoodChart extends StatelessWidget {
 
                     if (!shouldShow) return const SizedBox.shrink();
 
-                    // Optional: Avoid overlapping??
-                    // For now, let's just show them. Overlapping might occur if data is dense.
-                    // fl_chart might not handle overlapping well automatically with this custom logic.
-                    // A simple heuristic: if we just showed a label "close" to this one, skip?
-                    // Hard to track state inside this callback efficiently without side effects.
-                    // But typically fl_chart calls these in order.
-                    
-                    // Optimization: We only want to match exactly ONCE per "point". 
-                    // Since interval is 0.1, we might match multiple times for a point at 9.0 (8.9, 9.0, 9.1).
-                    // We should strictly match the closest interval step.
-                    // Or better: Use 'getTitlesWidget' just to look up if 'value' is IN a "Show List".
-                    
                     return Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         text,
                         style: const TextStyle(
-                          color: Colors.black, 
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold
+                          color: Colors.white70, 
+                          fontSize: 10, 
+                          fontWeight: FontWeight.w600
                         ),
                       ),
                     );
