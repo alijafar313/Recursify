@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
+import 'dart:math';
 
 /// AppDatabase is a small helper class that:
 /// 1) Creates / opens a local SQLite database file on the device.
@@ -915,49 +916,49 @@ class AppDatabase {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Day 0: Normal "Good" Day (06:00 - 23:00) - curve up then stable
-    await _insertSnap(db, today, 7, 0, 0);
-    await _insertSnap(db, today, 10, 0, 2);
-    await _insertSnap(db, today, 14, 0, 4);
-    await _insertSnap(db, today, 18, 0, 3);
-    await _insertSnap(db, today, 22, 0, 1);
-
-    // Day -1: "Stressful" Day (Zig Zag)
-    final d1 = today.subtract(const Duration(days: 1));
-    await _insertSnap(db, d1, 8, 0, -1);
-    await _insertSnap(db, d1, 11, 30, -3);
-    await _insertSnap(db, d1, 13, 0, 2); // Recovery lunch
-    await _insertSnap(db, d1, 16, 0, -4); // Crash
-    await _insertSnap(db, d1, 20, 0, -2);
-
-    // Day -2: "Early Bird" Test (Data OUTSIDE standard wake time)
-    final d2 = today.subtract(const Duration(days: 2));
-    await _insertSnap(db, d2, 4, 30, 3); // Early workout?
-    await _insertSnap(db, d2, 7, 0, 5); 
-    await _insertSnap(db, d2, 12, 0, 2);
-    await _insertSnap(db, d2, 20, 0, 0);
-
-    // Day -3: "Override" Day
-    // User sets schedule: Wake 10:00, Sleep 02:00
-    final d3 = today.subtract(const Duration(days: 3));
+    // Generate 14 days of "Realistic" data
+    // Pattern: 
+    // - Mornings (7-9am): Generally lower (groggy)
+    // - Mid-Morning (10-11am): Peak focus (high)
+    // - Post-Lunch (2-3pm): Dip (low)
+    // - Evening (6-8pm): Relaxed (positive)
+    // - Night (10pm+): Tired but neutral/calm
     
-    await db.insert('day_schedule', {
-      'date': DateFormat('yyyy-MM-dd').format(d3),
-      'wake_h': 10, 'wake_m': 0,
-      'sleep_h': 23, 'sleep_m': 0,
-    });
+    final r = Random();
     
-    await _insertSnap(db, d3, 9, 0, -2); // Woke up early, grumpy (Outside schedule)
-    await _insertSnap(db, d3, 11, 0, 1); // inside
-    await _insertSnap(db, d3, 15, 0, 3);
-    await _insertSnap(db, d3, 22, 0, 2);
+    for (int i = 0; i < 14; i++) {
+       final d = today.subtract(Duration(days: i));
+       
+       // Add some daily variance (some days are just bad days)
+       int dailyBias = r.nextInt(3) - 1; // -1, 0, or 1
+       if (i == 3) dailyBias = -2; // A specifically bad day
+       if (i == 6) dailyBias = 2; // A specifically awesome day
 
-    // Day -4: "Flat Line"
-    final d4 = today.subtract(const Duration(days: 4));
-    await _insertSnap(db, d4, 8, 0, 0);
-    await _insertSnap(db, d4, 12, 0, 0);
-    await _insertSnap(db, d4, 16, 0, 0);
-    await _insertSnap(db, d4, 20, 0, 0);
+       // Wake up (6:00 - 8:00)
+       await _insertSnap(db, d, 7 + r.nextInt(2), r.nextInt(60), -1 + dailyBias + r.nextInt(3)); // -1 to +2 range approx
+
+       // Mid Morning (10:00 - 11:30)
+       await _insertSnap(db, d, 10 + r.nextInt(2), r.nextInt(60), 3 + dailyBias + r.nextInt(2)); // High
+
+       // Lunch Dip (14:00 - 15:00)
+       await _insertSnap(db, d, 14, r.nextInt(60), 0 + dailyBias - r.nextInt(2)); // Dip
+
+       // Evening (18:00 - 20:00)
+       await _insertSnap(db, d, 18 + r.nextInt(2), r.nextInt(60), 2 + dailyBias + r.nextInt(2)); 
+       
+       // Late Night (22:00 - 23:30)
+       await _insertSnap(db, d, 22 + r.nextInt(1), r.nextInt(60), 0 + dailyBias);
+
+       // Sleep Logs (Assume consistent sleep for now to test stats)
+       // Sleep 23:30 -> 07:30
+       final sleepStart = DateTime(d.year, d.month, d.day, 23, 30).millisecondsSinceEpoch;
+       final sleepEnd = DateTime(d.year, d.month, d.day, 7, 30).add(const Duration(days: 1)).millisecondsSinceEpoch;
+       await db.insert('sleep_log', {
+          'start_time': sleepStart,
+          'end_time': sleepEnd,
+          'quality': 3 + r.nextInt(2), // 3-4 stars
+       });
+    }
     
     // Seed some insights
     await insertObservation('I feel better when I drink water.');
