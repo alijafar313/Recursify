@@ -30,14 +30,24 @@ class _ObservationsScreenState extends State<ObservationsScreen> with SingleTick
   }
 
   Future<void> _load() async {
-    final obs = await AppDatabase.getObservations();
-    final strats = await AppDatabase.getProblemSolutions();
-    if (mounted) {
-      setState(() {
-        _observations = List<Map<String, dynamic>>.from(obs);
-        _strategies = List<Map<String, dynamic>>.from(strats);
-        _isLoading = false;
-      });
+    try {
+      final obs = await AppDatabase.getObservations();
+      final strats = await AppDatabase.getProblemSolutions();
+      if (mounted) {
+        setState(() {
+          _observations = List<Map<String, dynamic>>.from(obs);
+          _strategies = List<Map<String, dynamic>>.from(strats);
+          _isLoading = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Error loading Observations: $e\n$stack');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading data: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

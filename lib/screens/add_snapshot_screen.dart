@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/app_database.dart';
+import '../services/amplification_service.dart';
 
 class AddSnapshotScreen extends StatefulWidget {
   final DateTime? specifiedDate; // If provided, we are inserting a past entry
@@ -134,6 +135,25 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
 
     if (!mounted) return;
     Navigator.of(context).pop(true);
+
+  }
+
+  Future<void> _park() async {
+     final title = _titleController.text.trim(); // We treat 'Context' as content prefix? 
+     // Spec says "Parked thought" is about thoughts. Usually text.
+     // Let's combine Title + Note.
+     
+     final content = '$title\n${_noteController.text.trim()}'.trim();
+     if (content.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter some text to park.')));
+        return;
+     }
+
+     await AppDatabase.parkThought(content, _intensity.toInt());
+     
+     if (!mounted) return;
+     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thought parked. We will review it later.')));
+     Navigator.of(context).pop(true);
   }
 
   @override
@@ -255,6 +275,45 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
                   ),
                 ),
               ),
+              
+              if (AmplificationService().isInWindow) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Amplification Window Active",
+                        style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Your timing suggests possible distortion. Parking this allows you to capture the thought without affecting your baseline statistics.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _park,
+                          icon: const Icon(Icons.outbox, color: Colors.purple),
+                          label: const Text('Park Thought (Don\'t Log to Graph)', style: TextStyle(color: Colors.purple)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.purple),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

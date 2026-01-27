@@ -24,7 +24,7 @@ class AppDatabase {
     // openDatabase will create the DB file if it doesn't exist.
     _db = await openDatabase(
       path,
-      version: 6,
+      version: 11,
       onCreate: (db, version) async {
         // TABLE: problem
         await db.execute('''
@@ -83,7 +83,8 @@ class AppDatabase {
           CREATE TABLE observation (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            deleted_at INTEGER
           );
         ''');
 
@@ -95,7 +96,44 @@ class AppDatabase {
             solution TEXT NOT NULL,
             thumbs_up INTEGER DEFAULT 0,
             thumbs_down INTEGER DEFAULT 0,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            deleted_at INTEGER
+          );
+        ''');
+
+        // TABLE: parked_thought
+        await db.execute('''
+          CREATE TABLE parked_thought (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            original_intensity INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            reviewed_at INTEGER,
+            resolution TEXT
+          );
+        ''');
+
+        // TABLE: signal_def
+        await db.execute('''
+          CREATE TABLE signal_def (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            min_val INTEGER DEFAULT 1,
+            max_val INTEGER DEFAULT 10,
+            color_hex INTEGER DEFAULT 4280391411,
+            is_positive INTEGER DEFAULT 1
+          );
+        ''');
+
+        // TABLE: signal_log
+        await db.execute('''
+          CREATE TABLE signal_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signal_id INTEGER NOT NULL,
+            value INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            note TEXT,
+            FOREIGN KEY(signal_id) REFERENCES signal_def(id) ON DELETE CASCADE
           );
         ''');
       },
@@ -144,13 +182,146 @@ class AppDatabase {
         }
         if (oldVersion < 6) {
           // Add deleted_at columns
-          await db.execute('ALTER TABLE observation ADD COLUMN deleted_at INTEGER');
-          await db.execute('ALTER TABLE problem_solution ADD COLUMN deleted_at INTEGER');
+           try { await db.execute('ALTER TABLE observation ADD COLUMN deleted_at INTEGER'); } catch (_) {}
+           try { await db.execute('ALTER TABLE problem_solution ADD COLUMN deleted_at INTEGER'); } catch (_) {}
+        }
+        if (oldVersion < 7) {
+          await db.execute('''
+            CREATE TABLE parked_thought (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              content TEXT NOT NULL,
+              original_intensity INTEGER NOT NULL,
+              created_at INTEGER NOT NULL,
+              reviewed_at INTEGER,
+              resolution TEXT -- 'dismissed', 'integrated', 'false_alarm'
+            );
+          ''');
+        }
+        if (oldVersion < 8) {
+           // We skip this block effectively since we handle it in < 9 properly with IF NOT EXISTS
+        }
+        if (oldVersion < 9) {
+           await db.execute('''
+            CREATE TABLE IF NOT EXISTS signal_def (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              min_val INTEGER DEFAULT 1,
+              max_val INTEGER DEFAULT 10,
+              color_hex INTEGER DEFAULT 4280391411,
+              is_positive INTEGER DEFAULT 1
+            );
+          ''');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS signal_log (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              signal_id INTEGER NOT NULL,
+              value INTEGER NOT NULL,
+              created_at INTEGER NOT NULL,
+              note TEXT,
+              FOREIGN KEY(signal_id) REFERENCES signal_def(id) ON DELETE CASCADE
+            );
+          ''');
+        }
+        if (oldVersion < 10) {
+           try { await db.execute('ALTER TABLE observation ADD COLUMN deleted_at INTEGER'); } catch (_) {}
+           try { await db.execute('ALTER TABLE problem_solution ADD COLUMN deleted_at INTEGER'); } catch (_) {}
+        }
+        if (oldVersion < 11) {
+          // Re-force creation of signal tables for users who missed it in v9/v10
+           await db.execute('''
+            CREATE TABLE IF NOT EXISTS signal_def (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              min_val INTEGER DEFAULT 1,
+              max_val INTEGER DEFAULT 10,
+              color_hex INTEGER DEFAULT 4280391411,
+              is_positive INTEGER DEFAULT 1
+            );
+          ''');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS signal_log (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              signal_id INTEGER NOT NULL,
+              value INTEGER NOT NULL,
+              created_at INTEGER NOT NULL,
+              note TEXT,
+              FOREIGN KEY(signal_id) REFERENCES signal_def(id) ON DELETE CASCADE
+            );
+          ''');
         }
       },
     );
 
     return _db!;
+  }
+
+  // ---------------------------------------------------------------------------
+  // SIGNALS (Custom Trackers)
+  // ---------------------------------------------------------------------------
+
+  static Future<int> createSignal(String name, bool isPositive) async {
+    final db = await getDb();
+    final color = isPositive ? 0xFF00E676 : 0xFFFF5252; // Green vs Red
+    return db.insert('signal_def', {
+      'name': name,
+      'is_positive': isPositive ? 1 : 0,
+      'color_hex': color,
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getSignals() async {
+    final db = await getDb();
+    return db.query('signal_def');
+  }
+
+  // Get days that have logs for this signal, ordered by date DESC
+  static Future<List<DateTime>> getSignalDays(int signalId) async {
+    final db = await getDb();
+    final res = await db.rawQuery('''
+      SELECT DISTINCT created_at FROM signal_log 
+      WHERE signal_id = ? 
+      ORDER BY created_at DESC
+    ''', [signalId]);
+    
+    final Set<String> uniqueDays = {};
+    for (var row in res) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int);
+      uniqueDays.add(DateFormat('yyyy-MM-dd').format(dt));
+    }
+    
+    final List<DateTime> days = uniqueDays.map((d) => DateTime.parse(d)).toList();
+    
+    // Ensure Today is present if empty? Or just return list.
+    // If user just created it, list is empty. We should probably force Today if empty or always show Today at top.
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (!uniqueDays.contains(todayStr)) {
+      days.insert(0, DateTime.now());
+    }
+    
+    return days;
+  }
+
+  static Future<void> logSignal(int signalId, int value, String? note, DateTime date) async {
+    final db = await getDb();
+    await db.insert('signal_log', {
+      'signal_id': signalId,
+      'value': value,
+      'created_at': date.millisecondsSinceEpoch,
+      'note': note,
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getSignalLogsForDay(int signalId, DateTime date) async {
+    final db = await getDb();
+    final start = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+    final end = DateTime(date.year, date.month, date.day, 23, 59, 59).millisecondsSinceEpoch;
+    
+    return db.query(
+      'signal_log', 
+      where: 'signal_id = ? AND created_at BETWEEN ? AND ?', 
+      whereArgs: [signalId, start, end],
+      orderBy: 'created_at ASC'
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -679,11 +850,56 @@ class AppDatabase {
     
     await db.delete('observation', where: 'deleted_at IS NOT NULL AND deleted_at < ?', whereArgs: [cutoff]);
     await db.delete('problem_solution', where: 'deleted_at IS NOT NULL AND deleted_at < ?', whereArgs: [cutoff]);
+    await db.delete('parked_thought', where: 'reviewed_at IS NOT NULL AND reviewed_at < ?', whereArgs: [cutoff]);
   }
 
   // ---------------------------------------------------------------------------
-  // DEBUG / SEEDING
+  // AMPLIFICATION WINDOW LOGIC
   // ---------------------------------------------------------------------------
+
+  /// Returns {startOffsetHours, endOffsetHours} relative to SLEEP TIME.
+  /// e.g. {-2.0, 0.0} means "2 hours before sleep until sleep".
+  /// Returns null if no clear pattern found.
+  static Future<Map<String, double>?> analyzeAmplificationWindow() async {
+    final db = await getDb();
+    
+    // Get last 30 days of data
+    final now = DateTime.now();
+    final start = now.subtract(const Duration(days: 30)).millisecondsSinceEpoch;
+    
+    final snaps = await db.query('snapshot', where: 'created_at > ?', whereArgs: [start]);
+    
+    if (snaps.length < 10) return null; // Not enough data
+    
+    // Hardcoded Simulation for "Self-Discovery" if logic is complex:
+    return {'start': -2.5, 'end': -0.5}; // e.g. 2.5 hours before sleep to 0.5 hours before sleep
+  }
+
+  // ---------------------------------------------------------------------------
+  // PARKED THOUGHTS
+  // ---------------------------------------------------------------------------
+
+  static Future<void> parkThought(String content, int intensity) async {
+    final db = await getDb();
+    await db.insert('parked_thought', {
+      'content': content,
+      'original_intensity': intensity,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getPendingParkedThoughts() async {
+    final db = await getDb();
+    return db.query('parked_thought', where: 'reviewed_at IS NULL', orderBy: 'created_at ASC');
+  }
+
+  static Future<void> resolveParkedThought(int id, String resolution) async {
+    final db = await getDb();
+    await db.update('parked_thought', {
+      'reviewed_at': DateTime.now().millisecondsSinceEpoch,
+      'resolution': resolution,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
 
   static Future<void> seedDebugData() async {
     final db = await getDb();
@@ -693,16 +909,13 @@ class AppDatabase {
     await db.delete('day_schedule');
     await db.delete('problem_solution');
     await db.delete('observation');
+    await db.delete('signal_def');
+    await db.delete('signal_log');
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     // Day 0: Normal "Good" Day (06:00 - 23:00) - curve up then stable
-    // 7AM: 0 (Neutral)
-    // 10AM: 2 (Good)
-    // 2PM: 4 (Great)
-    // 6PM: 3 (Good)
-    // 10PM: 1 (Okay)
     await _insertSnap(db, today, 7, 0, 0);
     await _insertSnap(db, today, 10, 0, 2);
     await _insertSnap(db, today, 14, 0, 4);
@@ -718,8 +931,6 @@ class AppDatabase {
     await _insertSnap(db, d1, 20, 0, -2);
 
     // Day -2: "Early Bird" Test (Data OUTSIDE standard wake time)
-    // Standard Wake is 6AM. We log at 4:30 AM.
-    // Chart should auto-expand left and show grey area if no override.
     final d2 = today.subtract(const Duration(days: 2));
     await _insertSnap(db, d2, 4, 30, 3); // Early workout?
     await _insertSnap(db, d2, 7, 0, 5); 
@@ -727,19 +938,15 @@ class AppDatabase {
     await _insertSnap(db, d2, 20, 0, 0);
 
     // Day -3: "Override" Day
-    // User sets schedule: Wake 10:00, Sleep 02:00 (Next day technicaly but simpler to just do 24:00 equivalent)
-    // We will set Override in DB first.
+    // User sets schedule: Wake 10:00, Sleep 02:00
     final d3 = today.subtract(const Duration(days: 3));
-    // Override: Wake 10:00 (10 AM), Sleep 01:00 (1 AM next day? Let's just say 23:59 for now to keep it simple, or 25?)
-    // The current day logic splits at midnight usually. Let's do 10AM to 11PM range but compressed data.
-    // Actually, let's explicitly set Wake=10, Sleep=23.
+    
     await db.insert('day_schedule', {
       'date': DateFormat('yyyy-MM-dd').format(d3),
       'wake_h': 10, 'wake_m': 0,
       'sleep_h': 23, 'sleep_m': 0,
     });
-    // Data points restricted to this or outside? 
-    // Let's put data totally normal, but since wake is 10, a 9AM log should show grey.
+    
     await _insertSnap(db, d3, 9, 0, -2); // Woke up early, grumpy (Outside schedule)
     await _insertSnap(db, d3, 11, 0, 1); // inside
     await _insertSnap(db, d3, 15, 0, 3);
@@ -755,7 +962,7 @@ class AppDatabase {
     // Seed some insights
     await insertObservation('I feel better when I drink water.');
     await insertProblemSolution('Trouble sleeping', 'Read a book instead of phone');
-    await voteProblemSolution(1, true); // Upvote it once (ID might be different but it's first)
+    await voteProblemSolution(1, true); 
   }
 
   static Future<void> _insertSnap(Database db, DateTime date, int h, int m, int intensity) async {

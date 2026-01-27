@@ -4,8 +4,10 @@ import 'sleep_screen.dart';
 import 'general_analytics_screen.dart';
 import 'ai_screen.dart';
 import 'observations_screen.dart';
+import 'tracker_screen.dart';
 
 import 'settings_screen.dart';
+import '../services/amplification_service.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -25,10 +27,16 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    // Check amplification state on startup
+    AmplificationService().checkState().then((_) {
+      if (mounted) setState(() {});
+    });
+
     _screens = [
        HomeScreen(key: _homeKey),
-       const SleepScreen(),
+       // const SleepScreen(),
        const GeneralAnalyticsScreen(),
+       const TrackerScreen(),
        const ObservationsScreen(),
        const AIScreen(),
     ];
@@ -67,13 +75,19 @@ class _MainShellState extends State<MainShell> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bed),
-            label: 'Sleep',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Analytics',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.show_chart),
+            label: 'Signals',
+          ),
+          /*
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bed),
+            label: 'Sleep',
+          ),
+          */
           BottomNavigationBarItem(
             icon: Icon(Icons.lightbulb_outline),
             label: 'Insights',

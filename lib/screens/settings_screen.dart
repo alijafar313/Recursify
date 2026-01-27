@@ -195,6 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+/*
           const Divider(),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
@@ -229,6 +230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
           ),
+          */
           const Divider(),
           ListTile(
             leading: const Icon(Icons.delete_outline),

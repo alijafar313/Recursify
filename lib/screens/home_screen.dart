@@ -5,6 +5,7 @@ import '../data/app_database.dart';
 import '../widgets/daily_mood_chart.dart';
 import 'add_snapshot_screen.dart';
 import 'day_detail_screen.dart';
+import '../services/amplification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -155,8 +156,32 @@ class HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
               padding: const EdgeInsets.only(bottom: 100),
-              itemCount: _days.length,
-              itemBuilder: (context, index) {
+              itemCount: _days.length + (AmplificationService().isInWindow ? 1 : 0),
+              itemBuilder: (context, idx) {
+                // If banner is active, it takes index 0
+                bool showBanner = AmplificationService().isInWindow;
+                if (showBanner) {
+                  if (idx == 0) {
+                     return Container(
+                       margin: const EdgeInsets.all(16),
+                       padding: const EdgeInsets.all(16),
+                       decoration: BoxDecoration(
+                         color: Colors.purple.withOpacity(0.1),
+                         border: Border.all(color: Colors.purpleAccent),
+                         borderRadius: BorderRadius.circular(16),
+                       ),
+                       child: const Column(
+                         children: [
+                            Text('Amplification Window Detected', style: TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                            SizedBox(height: 4),
+                            Text('Your mind is currently amplifying negative signals. Do not interpret thoughts right now.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+                         ],
+                       ),
+                     );
+                  }
+                }
+                
+                final index = showBanner ? idx - 1 : idx;
                 final date = _days[index];
                 final key = DateFormat('yyyy-MM-dd').format(date);
                 final ov = _overrides[key];
