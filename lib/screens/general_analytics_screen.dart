@@ -159,7 +159,7 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
       padding: const EdgeInsets.all(32),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Text(msg, style: const TextStyle(color: Colors.grey), textAlign: TextAlign.center),
@@ -215,7 +215,7 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
       gradientColors = [const Color(0xFFFF2E63), const Color(0xFFFF2E63)];
       gradientStops = [0.0, 1.0];
     } else {
-      // Crossing zero
+      // 0.02 band logic replaced with SHARP CUT
       gradientColors = [
         const Color(0xFFFF2E63), // Red
         const Color(0xFFFF2E63),
@@ -224,18 +224,89 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
       ];
       gradientStops = [
         0.0,
-        zeroPos.clamp(0.0, 1.0),        // Red until 0
-        (zeroPos + 0.001).clamp(0.0, 1.0), // Switch to Green immediately
+        zeroPos.clamp(0.0, 1.0),
+        (zeroPos + 0.001).clamp(0.0, 1.0),
         1.0,
       ];
     }
+    
+    // DETECT ZERO SEGMENTS (for Cyan Overlay)
+    final List<LineChartBarData> extraLines = [];
+    if (spots.length >= 2) {
+      List<FlSpot> currentZeroSegment = [];
+      for (int i = 0; i < spots.length; i++) {
+        final spot = spots[i];
+        if ((spot.y).abs() < 0.001) {
+           currentZeroSegment.add(spot);
+        } else {
+           if (currentZeroSegment.length >= 2) {
+             extraLines.add(_createZeroBarData(List.from(currentZeroSegment)));
+           }
+           currentZeroSegment.clear();
+        }
+      }
+      if (currentZeroSegment.length >= 2) {
+         extraLines.add(_createZeroBarData(List.from(currentZeroSegment)));
+      }
+    }
+
+    final mainBarData = LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.18, // Matches Home chart tightness
+              preventCurveOverShooting: true, // Fixes artifacts near 0
+              barWidth: 4,
+              isStrokeCapRound: true,
+              shadow: const Shadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 4)),
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: gradientColors,
+                stops: gradientStops,
+              ),
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, barData, index) {
+                   Color c = const Color(0xFF08D9D6);
+                   if (spot.y > 0.001) c = const Color(0xFF20BF55);
+                   if (spot.y < -0.001) c = const Color(0xFFFF2E63);
+                   return FlDotCirclePainter(radius: 4, color: Colors.white, strokeWidth: 2, strokeColor: c);
+                }
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF20BF55).withOpacity(0.2), 
+                    Colors.transparent
+                  ],
+                ),
+                cutOffY: 0,
+                applyCutOffY: true, 
+              ),
+              aboveBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    const Color(0xFFFF2E63).withOpacity(0.2),
+                    Colors.transparent
+                  ],
+                ),
+                cutOffY: 0,
+                applyCutOffY: true,
+              )
+            );
 
     return Container(
       height: 250,
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 24, 24, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
@@ -288,55 +359,8 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
           ),
           borderData: FlBorderData(show: false),
           lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              curveSmoothness: 0.35,
-              barWidth: 4,
-              isStrokeCapRound: true,
-              shadow: const Shadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 4)),
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: gradientColors,
-                stops: gradientStops,
-              ),
-              dotData: FlDotData(
-                show: true,
-                getDotPainter: (spot, percent, barData, index) {
-                   Color c = const Color(0xFF08D9D6);
-                   if (spot.y > 0) c = const Color(0xFF20BF55);
-                   if (spot.y < 0) c = const Color(0xFFFF2E63);
-                   return FlDotCirclePainter(radius: 4, color: Colors.white, strokeWidth: 2, strokeColor: c);
-                }
-              ),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF20BF55).withOpacity(0.2), 
-                    Colors.transparent
-                  ],
-                ),
-                cutOffY: 0,
-                applyCutOffY: true, 
-              ),
-              aboveBarData: BarAreaData(
-                 show: true,
-                 gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                   colors: [
-                     const Color(0xFFFF2E63).withOpacity(0.2),
-                     Colors.transparent
-                   ]
-                 ),
-                 cutOffY: 0,
-                 applyCutOffY: true,
-              )
-            ),
+            mainBarData,
+            ...extraLines,
           ],
             lineTouchData: LineTouchData(
               enabled: false, // Disable touch since we show permanent tooltips
@@ -354,7 +378,7 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
                         // For Hourly: "8am\n2.0"
                         spot.y.toStringAsFixed(1),
                         TextStyle(
-                          color: spot.y > 0 ? const Color(0xFF20BF55) : (spot.y < 0 ? const Color(0xFFFF2E63) : const Color(0xFF08D9D6)), 
+                          color: spot.y > 0.001 ? const Color(0xFF20BF55) : (spot.y < -0.001 ? const Color(0xFFFF2E63) : const Color(0xFF08D9D6)), 
                           fontWeight: FontWeight.bold,
                           fontSize: 10,
                         )
@@ -368,14 +392,26 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
             showingTooltipIndicators: spots.map((s) {
                return ShowingTooltipIndicators([
                  LineBarSpot(
-                   LineChartBarData(spots: spots), 
-                   spots.indexOf(s), 
-                   s
+                   mainBarData, // Use mainBarData reference logic
+                   0, 
+                   s // The spot
                  )
                ]);
             }).toList(),
         ),
       ),
+    );
+  }
+  
+  LineChartBarData _createZeroBarData(List<FlSpot> spots) {
+    return LineChartBarData(
+      spots: spots,
+      isCurved: false,
+      barWidth: 4,
+      color: const Color(0xFF08D9D6), // Neon Cyan
+      isStrokeCapRound: true,
+      dotData: FlDotData(show: false),
+      belowBarData: BarAreaData(show: false),
     );
   }
 }

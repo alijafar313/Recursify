@@ -1118,6 +1118,24 @@ class AppDatabase {
     await insertObservation('I feel better when I drink water.');
     await insertProblemSolution('Trouble sleeping', 'Read a book instead of phone');
     await voteProblemSolution(1, true); 
+    await insertProblemSolution('Trouble sleeping', 'Read a book instead of phone');
+    await voteProblemSolution(1, true); 
+  }
+
+  static Future<void> seedZeroData() async {
+    final db = await getDb();
+    final now = DateTime.now();
+    // Clear today's snapshots (from 6am to 6am next day)
+    final start = DateTime(now.year, now.month, now.day, 6).millisecondsSinceEpoch;
+    final end = DateTime(now.year, now.month, now.day, 6).add(const Duration(days: 1)).millisecondsSinceEpoch;
+    
+    await db.delete('snapshot', where: 'created_at >= ? AND created_at < ?', whereArgs: [start, end]);
+
+    // Insert 0s
+    await _insertSnap(db, now, 8, 0, 0);
+    await _insertSnap(db, now, 12, 0, 0);
+    await _insertSnap(db, now, 16, 0, 0);
+    await _insertSnap(db, now, 20, 0, 0);
   }
 
   static Future<void> _insertSnap(Database db, DateTime date, int h, int m, int intensity) async {

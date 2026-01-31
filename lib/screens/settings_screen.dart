@@ -260,6 +260,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.exposure_zero, color: Colors.purple),
+            title: const Text('Developer: Seed Zero Day', style: TextStyle(color: Colors.purple)),
+            subtitle: const Text('Sets today to all 0s (Cyan test)'),
+            onTap: () async {
+              await AppDatabase.seedZeroData();
+              if (mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Today seeded with zeros! Refresh Home.')),
+                 );
+              }
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.notifications_active, color: Colors.purple),
             title: const Text('Developer: Test Notification', style: TextStyle(color: Colors.purple)),
             subtitle: const Text('Triggers the "Log Mood" notification now'),

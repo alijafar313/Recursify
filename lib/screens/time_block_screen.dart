@@ -288,7 +288,7 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Weekly Schedule'),
         backgroundColor: Colors.transparent,
@@ -322,7 +322,7 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
                     margin: const EdgeInsets.only(right: 12),
                     width: 50,
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF00E676) : const Color(0xFF2C2C2C),
+                      color: isSelected ? const Color(0xFF00E676) : Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: isSelected
                           ? [
@@ -358,7 +358,8 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
                 : LayoutBuilder(builder: (context, constraints) {
                   // Calculate height: 24 hours * 60 px/hr (example)
                   const double hourHeight = 60.0;
-                  const double totalHeight = 24 * hourHeight + 20; // 20 padding
+                  const double topPadding = 32.0; // Buffer for 00:00 label
+                  const double totalHeight = topPadding + 24 * hourHeight + 20; // 20 bottom padding
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.only(bottom: 80), // Fab space
@@ -369,7 +370,7 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
                           // Background Grid
                           for (int i = 0; i <= 24; i++)
                             Positioned(
-                              top: i * hourHeight,
+                              top: topPadding + i * hourHeight,
                               left: 0,
                               right: 0,
                               child: Container(
@@ -377,15 +378,15 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
                                 color: Colors.white.withOpacity(0.1),
                               ),
                             ),
-                          // Time Labels
+                          // Time Labels (Above the line)
                           for (int i = 0; i <= 24; i++)
                             Positioned(
-                              top: i * hourHeight - 6,
+                              top: topPadding + i * hourHeight - 18, // Move up to sit above line
                               left: 16,
                               child: Text(
                                 '${i.toString().padLeft(2, '0')}:00',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.3),
+                                  color: Colors.white.withOpacity(0.5), // Slightly brighter
                                   fontSize: 12,
                                 ),
                               ),
@@ -397,7 +398,7 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
                              final endMins = block.endH * 60 + block.endM;
                              final durationMins = endMins - startMins;
                              
-                             final double top = (startMins / 60) * hourHeight;
+                             final double top = topPadding + (startMins / 60) * hourHeight;
                              final double height = (durationMins / 60) * hourHeight;
                              
                              // Default green is 0xFF00E676
@@ -458,7 +459,7 @@ class _TimeBlockScreenState extends State<TimeBlockScreen> {
                             Builder(builder: (c) {
                                final now = DateTime.now();
                                final mins = now.hour * 60 + now.minute;
-                               final top = (mins / 60) * hourHeight;
+                               final top = topPadding + (mins / 60) * hourHeight;
                                return Positioned(
                                  top: top,
                                  left: 0,

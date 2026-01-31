@@ -86,7 +86,7 @@ class _SignalDetailScreenState extends State<SignalDetailScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
         return StatefulBuilder(
@@ -209,7 +209,7 @@ class _SignalDetailScreenState extends State<SignalDetailScreen> {
                     Container(
                       padding: const EdgeInsets.fromLTRB(12, 24, 24, 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E1E),
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
@@ -271,7 +271,7 @@ class _SignalDetailScreenState extends State<SignalDetailScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
          return StatefulBuilder(
@@ -390,7 +390,7 @@ class _SignalDetailScreenState extends State<SignalDetailScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF2C2C2C), // Slightly lighter for nested
+      backgroundColor: Theme.of(context).cardColor, 
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
         return StatefulBuilder(builder: (context, setSheetState) {

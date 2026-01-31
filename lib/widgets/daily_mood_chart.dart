@@ -144,48 +144,75 @@ class DailyMoodChart extends StatelessWidget {
       // Flat line at 0 (Neutral)
       gradientColors = [const Color(0xFF08D9D6), const Color(0xFF08D9D6)]; // Neon Cyan
       gradientStops = [0.0, 1.0];
-    } else if (maxY <= 0) {
-      // All negative
+    } else if (maxY < -0.001) {
+      // All negative (strictly)
       gradientColors = [const Color(0xFFFF2E63), const Color(0xFFFF2E63)];
       gradientStops = [0.0, 1.0];
-    } else if (minY >= 0) {
-      // All positive
+    } else if (minY > 0.001) {
+      // All positive (strictly)
       gradientColors = [const Color(0xFF20BF55), const Color(0xFF20BF55)];
       gradientStops = [0.0, 1.0];
     } else {
-      // Crossing zero
-      // Calculate where 0 is in the range [minY, maxY]
+      // Crossing zero OR touching zero
       final range = maxY - minY;
-      final zeroPos = (0.0 - minY) / range;
+      // Protect against division by zero (though handled by first if)
+      double zeroPos = 0.0;
+      if (range > 0) {
+        zeroPos = (0.0 - minY) / range;
+      }
       
-      // We want a tiny yellow band at zero? Or just hard cut?
-      // User said: "zero is neutral, which makes it yellow"
-      // Let's add a small band around zeroPos
-      final epsilon = 0.05; // 5% band around zero
+      // 0.02 band logic replaced with SHARP CUT
+      // But we still want to handle '0.0 - minY' ratio etc.
       
+      // SHARP GRADIENT: Red until 0, Green after 0.
       gradientColors = [
-        const Color(0xFFFF2E63), // Neon Red
-        const Color(0xFFFF2E63), 
-        const Color(0xFF08D9D6), // Neon Cyan (Neutral)
-        const Color(0xFF08D9D6), // 
-        const Color(0xFF20BF55), // Neon Green
-        const Color(0xFF20BF55)
+        const Color(0xFFFF2E63), // Red
+        const Color(0xFFFF2E63),
+        const Color(0xFF20BF55), // Green
+        const Color(0xFF20BF55),
       ];
       gradientStops = [
-        0.0, 
-        (zeroPos - epsilon).clamp(0.0, 1.0), 
-        (zeroPos - epsilon + 0.001).clamp(0.0, 1.0),
-        (zeroPos + epsilon).clamp(0.0, 1.0),
-        (zeroPos + epsilon + 0.001).clamp(0.0, 1.0), 
-        1.0
+        0.0,
+        zeroPos.clamp(0.0, 1.0),
+        (zeroPos + 0.001).clamp(0.0, 1.0),
+        1.0,
       ];
+    }
+    
+    // DETECT ZERO SEGMENTS (for Cyan Overlay)
+    // We want to find sub-lists of spots that are consecutive zeros.
+    // e.g. [Pt(1,0), Pt(2,0)] -> Draw Cyan line from 1 to 2.
+    // If we have [Pt(1,0), Pt(2,5), Pt(3,0)] -> specific points are cyan, but no line segment.
+    
+    final List<LineChartBarData> extraLines = [];
+    
+    if (spots.length >= 2) {
+      List<FlSpot> currentZeroSegment = [];
+      
+      for (int i = 0; i < spots.length; i++) {
+        final spot = spots[i];
+        if ((spot.y).abs() < 0.001) {
+           currentZeroSegment.add(spot);
+        } else {
+           if (currentZeroSegment.length >= 2) {
+             // We have a segment to add
+             extraLines.add(_createZeroBarData(List.from(currentZeroSegment)));
+           }
+           currentZeroSegment.clear();
+        }
+      }
+      // Check last
+      if (currentZeroSegment.length >= 2) {
+         extraLines.add(_createZeroBarData(List.from(currentZeroSegment)));
+      }
     }
 
     // Create the bar data once so we can reference it
     final mainBarData = LineChartBarData(
       spots: spots,
       isCurved: true,
-      curveSmoothness: 0.35, // Very smooth
+      curveSmoothness: 0.18, // Tighter curve to prevent overshooting 0
+      preventCurveOverShooting: true, // Prevents wobbling on flat lines (0 to 0)
       barWidth: 5, // Thicker line
       isStrokeCapRound: true,
       shadow: const Shadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)), // Subtle depth
@@ -201,8 +228,8 @@ class DailyMoodChart extends StatelessWidget {
         show: true,
         getDotPainter: (spot, percent, barData, index) {
            Color dotColor = const Color(0xFF08D9D6); // Default Cyan
-           if (spot.y > 0) dotColor = const Color(0xFF20BF55); // Green
-           if (spot.y < 0) dotColor = const Color(0xFFFF2E63); // Red
+           if (spot.y > 0.001) dotColor = const Color(0xFF20BF55); // Green
+           if (spot.y < -0.001) dotColor = const Color(0xFFFF2E63); // Red
            
            // White center, colored ring
            return FlDotCirclePainter(
@@ -266,11 +293,21 @@ class DailyMoodChart extends StatelessWidget {
               handleBuiltInTouches: false,
               touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
                 if (event is FlTapUpEvent) {
+                   // We need to check if we tapped the main bar or the zero bar?
+                   // Response gives us spots.
                    if (response != null && response.lineBarSpots != null && response.lineBarSpots!.isNotEmpty) {
                       // Tap on a point -> Edit
-                      final spotIndex = response.lineBarSpots!.first.spotIndex;
-                      final snapshot = sorted[spotIndex];
-                      onPointTap?.call(snapshot);
+                      // Find which spot in the MAIN list corresponds to this x 
+                      // (Zero bars are just overlays on same X)
+                      final touchedSpot = response.lineBarSpots!.first;
+                      // Find index in `spots` that matches `touchedSpot.x`
+                      // Because `touchedSpot.spotIndex` might refer to the zero-list if we tapped that.
+                      
+                      final realIndex = spots.indexWhere((s) => (s.x - touchedSpot.x).abs() < 0.001);
+                      if (realIndex != -1) {
+                         final snapshot = sorted[realIndex];
+                         onPointTap?.call(snapshot);
+                      }
                    } else {
                       // Tap on background -> Day Detail
                       onChartTap?.call();
@@ -283,8 +320,17 @@ class DailyMoodChart extends StatelessWidget {
                 tooltipMargin: 14, // Adjusted to be midway between 5 and 24
                 getTooltipItems: (List<LineBarSpot> touchedSpots) {
                   return touchedSpots.map((touchedSpot) {
-                    final index = spots.indexOf(touchedSpot);
+                    // Match to main spots
+                    final index = spots.indexWhere((s) => (s.x - touchedSpot.x).abs() < 0.001);
                     if (index == -1) return null;
+                    
+                    // We only want to show ONE tooltip per X. 
+                    // If we have overlaid bars, we might get multiple items for same X?
+                    // Usually separate bars create separate items. 
+                    // We can filter duplicates here or just let the MainBarData handle tooltips
+                    // Since we passed `showingTooltipIndicators` ONLY for mainBarData, we should be fine?
+                    // Actually, overlays might not have tooltips unless we ask.
+                    
                     return LineTooltipItem(
                       sorted[index].label ?? sorted[index].title,
                       const TextStyle(
@@ -390,7 +436,10 @@ class DailyMoodChart extends StatelessWidget {
                }).toList(),
             ),
             
-            lineBarsData: [mainBarData],
+            lineBarsData: [
+               mainBarData,
+               ...extraLines, // Add Zero Lines on top
+            ],
           ),
         ),
       ),
@@ -402,6 +451,17 @@ class DailyMoodChart extends StatelessWidget {
     while (normalized >= 24) normalized -= 24;
     final dt = DateTime(2022, 1, 1, normalized.toInt(), (normalized % 1 * 60).toInt());
     return DateFormat('h:mm a').format(dt).toLowerCase().replaceAll(':00', ''); // 9 am, 2:30 pm
+  }
+  LineChartBarData _createZeroBarData(List<FlSpot> spots) {
+    return LineChartBarData(
+      spots: spots,
+      isCurved: false, // Flat lines are straight
+      barWidth: 5,
+      color: const Color(0xFF08D9D6), // Neon Cyan
+      isStrokeCapRound: true,
+      dotData: FlDotData(show: false), // Dots handled by main bar
+      belowBarData: BarAreaData(show: false),
+    );
   }
 }
 

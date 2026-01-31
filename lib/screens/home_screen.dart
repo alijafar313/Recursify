@@ -37,7 +37,9 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _isLoading = true);
+    if (_days.isEmpty) { 
+      setState(() => _isLoading = true);
+    }
     final days = await AppDatabase.getDaysWithData();
     
     // Ensure "Today" is always first, even if no data yet
@@ -149,12 +151,21 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.only(bottom: 100),
               itemCount: _days.length + (AmplificationService().isInWindow ? 1 : 0),
               itemBuilder: (context, idx) {
@@ -278,8 +289,8 @@ class _DayCardState extends State<_DayCard> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF1e1e1e), // Dark Matte
-            Color(0xFF252525),
+            Color(0xFF1E293B), // Slate 800
+            Color(0xFF0F172A), // Slate 900
           ],
         ),
         boxShadow: [
@@ -368,7 +379,9 @@ class _DayCardState extends State<_DayCard> {
                            ),
                          );
                          if (changed == true) {
-                           _load();
+                           setState(() {
+                             _load();
+                           });
                          }
                       },
                     );
