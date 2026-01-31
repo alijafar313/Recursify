@@ -259,6 +259,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.notifications_active, color: Colors.purple),
+            title: const Text('Developer: Test Notification', style: TextStyle(color: Colors.purple)),
+            subtitle: const Text('Triggers the "Log Mood" notification now'),
+            onTap: () async {
+              await NotificationService().triggerNotification(
+                title: 'How are you feeling?',
+                body: 'Tap "Quick Log" to enter -5 to 5',
+              );
+              
+              if (mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Notification sent! Check your status bar.')),
+                 );
+              }
+            },
+          ),
 
           const SizedBox(height: 80),
         ],

@@ -14,6 +14,7 @@ class AddSnapshotScreen extends StatefulWidget {
 
 class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
   final _titleController = TextEditingController();
+  final _labelController = TextEditingController(); // New Label Controller
   final _noteController = TextEditingController();
 
   double _intensity = 0; // Neutral start (-5 to 5)
@@ -28,6 +29,7 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
     if (widget.existingSnapshot != null) {
       final s = widget.existingSnapshot!;
       _titleController.text = s.title;
+      _labelController.text = s.label ?? '';
       _noteController.text = s.note ?? '';
       _intensity = s.intensity.toDouble();
       _selectedDate = DateTime.parse(s.timestamp);
@@ -55,6 +57,7 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
   @override
   void dispose() {
     _titleController.dispose();
+    _labelController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -78,6 +81,7 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
 
   Future<void> _save() async {
     final title = _titleController.text.trim();
+    final label = _labelController.text.trim();
     final note = _noteController.text.trim();
     final intensity = _intensity.toInt();
 
@@ -122,6 +126,7 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
         title: title,
         intensity: intensity,
         note: note,
+        label: label,
         timestamp: _selectedDate.toIso8601String(),
       );
     } else {
@@ -129,6 +134,7 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
         title: title,
         intensity: intensity,
         note: note,
+        label: label,
         timestamp: _selectedDate.toIso8601String(),
       );
     }
@@ -259,6 +265,39 @@ class _AddSnapshotScreenState extends State<AddSnapshotScreen> {
                   divisions: 10,
                   label: _intensity.toInt().toString(),
                   onChanged: (v) => setState(() => _intensity = v),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+              
+              // Label Input + Quick Emojis
+              TextField(
+                controller: _labelController,
+                decoration: const InputDecoration(
+                  labelText: 'Point Label (optional)',
+                  hintText: 'Displayed on graph (e.g. 🏠, Gym)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.label_outline),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final emo in ['🏠', '🏢', '🏋️', '❤️', '💤', '🍔', '🧘', '⚡'])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ActionChip(
+                          label: Text(emo, style: const TextStyle(fontSize: 18)),
+                          onPressed: () {
+                            _labelController.text = emo;
+                          },
+                          padding: const EdgeInsets.all(2),
+                        ),
+                      ),
+                  ],
                 ),
               ),
 

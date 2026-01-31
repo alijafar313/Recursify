@@ -111,7 +111,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.zonedSchedule(
       id,
       'How are you feeling?',
-      'Tap to log, or Reply with 1-10',
+      'Tap Quick Log to select mood (-5 to 5)',
       _nextInstanceOf(hour, minute),
       fln.NotificationDetails(
         android: fln.AndroidNotificationDetails(
@@ -121,10 +121,18 @@ class NotificationService {
           importance: fln.Importance.max,
           priority: fln.Priority.high,
           actions: [
-            const fln.AndroidNotificationAction(
+            fln.AndroidNotificationAction(
               'quick_log',
               'Quick Log',
-              inputs: [fln.AndroidNotificationActionInput(label: 'Enter 1-10')],
+              inputs: [
+                fln.AndroidNotificationActionInput(
+                  label: 'Select or Type (-5 to 5)',
+                  choices: const [
+                     '-5', '-4', '-3', '-2', '-1', '0', '1', '2', '3', '4', '5'
+                  ],
+                  allowFreeFormInput: true,
+                ),
+              ],
             ),
           ],
         ),
@@ -147,16 +155,66 @@ class NotificationService {
     return scheduledDate;
   }
 
+  Future<void> triggerNotification({required String title, required String body}) async {
+    await flutterLocalNotificationsPlugin.show(
+      99999, // Specific ID for test
+      title,
+      body,
+      fln.NotificationDetails(
+        android: fln.AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: fln.Importance.max,
+          priority: fln.Priority.high,
+           actions: [
+            fln.AndroidNotificationAction(
+              'quick_log',
+              'Quick Log',
+              inputs: [
+                fln.AndroidNotificationActionInput(
+                  label: 'Select or Type (-5 to 5)',
+                  choices: const [
+                    '-5', '-4', '-3', '-2', '-1', '0', '1', '2', '3', '4', '5'
+                  ],
+                  allowFreeFormInput: true, 
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleDirectReply(String input) async {
-    // Parse input (1-10)
+    // Parse input (-5 to 5)
     final intensity = int.tryParse(input.trim());
-    if (intensity != null && intensity >= 1 && intensity <= 10) {
+    if (intensity != null && intensity >= -5 && intensity <= 5) {
       await AppDatabase.insertSnapshot(
         title: 'Quick Log', // Default context for quick replies
         intensity: intensity,
         note: 'Via Notification',
       );
       print("Quick Log saved: $intensity");
+      
+      // Update the notification to show success and stop spinner
+      await flutterLocalNotificationsPlugin.show(
+        99999, // Use the same ID to overwrite (for test notification)
+        'Mood Logged',
+        'Saved mood intensity: $intensity',
+        const fln.NotificationDetails(
+          android: fln.AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDescription,
+            importance: fln.Importance.max,
+            priority: fln.Priority.high,
+            timeoutAfter: 3000, // Auto dismiss after 3s
+          ),
+        ),
+      );
+      
     } else {
       print("Invalid input: $input");
     }

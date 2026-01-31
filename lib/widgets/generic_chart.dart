@@ -10,6 +10,7 @@ class GenericChart extends StatelessWidget {
   final TimeOfDay? wakeTime;
   final TimeOfDay? sleepTime;
   final bool isPositiveSignal;
+  final Function(Map<String, dynamic>)? onSpotTap;
 
   const GenericChart({
     super.key,
@@ -20,6 +21,7 @@ class GenericChart extends StatelessWidget {
     this.wakeTime,
     this.sleepTime,
     this.isPositiveSignal = true,
+    this.onSpotTap,
   });
 
   @override
@@ -221,7 +223,20 @@ class GenericChart extends StatelessWidget {
              borderData: FlBorderData(show: false),
              lineBarsData: [mainBarData],
              
-             lineTouchData: LineTouchData(
+              lineTouchData: LineTouchData(
+               touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
+                 if (event is FlTapUpEvent && response != null && response.lineBarSpots != null) {
+                   if (response.lineBarSpots!.isNotEmpty) {
+                     final spotIndex = response.lineBarSpots!.first.spotIndex;
+                     if (onSpotTap != null && spotIndex >= 0 && spotIndex < logs.length) {
+                       onSpotTap!(logs[spotIndex]);
+                     }
+                   }
+                 }
+               },
+               handleBuiltInTouches: true, // Allow tooltip to show on tap too? Or just our action?
+               // Actually we want touch for editing.
+               
                touchTooltipData: LineTouchTooltipData(
                  getTooltipColor: (_) => Colors.transparent,
                  tooltipPadding: EdgeInsets.zero,

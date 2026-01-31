@@ -215,14 +215,47 @@ class _SignalDetailScreenState extends State<SignalDetailScreen> {
                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
                         ],
                       ),
-                      child: GenericChart(
-                        logs: logs,
-                        baseColor: color,
-                        minVal: 1, 
-                        maxVal: 10, 
-                        wakeTime: w,
-                        sleepTime: s,
-                        isPositiveSignal: isPos,
+                      child: Stack(
+                        children: [
+                          // The Chart
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0), // Space for button
+                            child: GenericChart(
+                              logs: logs,
+                              baseColor: color,
+                              minVal: 1, 
+                              maxVal: 10, 
+                              wakeTime: w,
+                              sleepTime: s,
+                              isPositiveSignal: isPos,
+                              // onSpotTap removed, interaction is via the button
+                            ),
+                          ),
+                          // The Edit Button
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: () => _showDayEditor(date, logs),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.edit, size: 14, color: Colors.white70),
+                                    SizedBox(width: 4),
+                                    Text('Edit', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -232,4 +265,237 @@ class _SignalDetailScreenState extends State<SignalDetailScreen> {
           ),
     );
   }
-}
+
+  // Shows a list of all logs for the day, with Add/Edit options
+  Future<void> _showDayEditor(DateTime date, List<Map<String, dynamic>> logs) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+         return StatefulBuilder(
+           builder: (context, setModalState) {
+             // Refresh logs in real-time if we edit one? 
+             // Ideally we just reload the parent on close, but within this modal we might need local state.
+             // For simplicity, we just rebuild the list.
+             
+             return SafeArea(
+               child: Container(
+                 height: MediaQuery.of(context).size.height * 0.6,
+                 padding: const EdgeInsets.all(24),
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Row(
+                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                       children: [
+                         Text(
+                           DateFormat('MMM d, yyyy').format(date),
+                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                         ),
+                         IconButton(
+                           icon: const Icon(Icons.add_circle, color: Colors.blueAccent, size: 32),
+                           onPressed: () async {
+                              await _addOrEditLog(null, date); // Add new
+                              Navigator.pop(context); // Close LIST to refresh everything? Or refresh list?
+                              _showDayEditor(date, await AppDatabase.getSignalLogsForDay(widget.signal['id'], date)); // Hacky refresh
+                           },
+                         )
+                       ],
+                     ),
+                     const SizedBox(height: 16),
+                     Expanded(
+                       child: logs.isEmpty 
+                         ? const Center(child: Text('No logs for this day.', style: TextStyle(color: Colors.white54)))
+                         : ListView.separated(
+                             itemCount: logs.length,
+                             separatorBuilder: (_, __) => const Divider(color: Colors.white24),
+                             itemBuilder: (context, index) {
+                               final log = logs[index];
+                               final dt = DateTime.fromMillisecondsSinceEpoch(log['created_at']);
+                               final val = log['value'];
+                               final note = log['note'] ?? '';
+                               
+                               return ListTile(
+                                 contentPadding: EdgeInsets.zero,
+                                 leading: Container(
+                                   width: 40, height: 40,
+                                   alignment: Alignment.center,
+                                   decoration: BoxDecoration(
+                                     color: Colors.white10,
+                                     shape: BoxShape.circle,
+                                   ),
+                                   child: Text('$val', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
+                                 ),
+                                 title: Text(DateFormat('h:mm a').format(dt), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                 subtitle: note.isNotEmpty ? Text(note, style: const TextStyle(color: Colors.white70)) : null,
+                                 trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.white54),
+                                        onPressed: () async {
+                                           await _addOrEditLog(log, date);
+                                           Navigator.pop(context);
+                                           _showDayEditor(date, await AppDatabase.getSignalLogsForDay(widget.signal['id'], date));
+                                        },
+                                      ),
+                                    ],
+                                 ),
+                               );
+                             },
+                           ),
+                     ),
+                   ],
+                 ),
+               ),
+             );
+           }
+         );
+      }
+    );
+    _loadAll(); // Refresh main screen when closed
+  }
+
+  // Replaces _editLog. Handles Create (log=null) and Update (log!=null)
+  Future<void> _addOrEditLog(Map<String, dynamic>? log, DateTime date) async {
+    final isEditing = log != null;
+    
+    // Initial State
+    int _val = isEditing ? (log!['value'] as int) : 5;
+    
+    // Time Logic
+    DateTime initialTime;
+    if (isEditing) {
+      initialTime = DateTime.fromMillisecondsSinceEpoch(log!['created_at']);
+    } else {
+      // If "Today", use Now. If past day, use Noon? Or Now if same day?
+      final now = DateTime.now();
+      if (date.year == now.year && date.month == now.month && date.day == now.day) {
+        initialTime = now;
+      } else {
+        initialTime = DateTime(date.year, date.month, date.day, 12, 0);
+      }
+    }
+    
+    TimeOfDay _time = TimeOfDay.fromDateTime(initialTime);
+    final noteController = TextEditingController(text: isEditing ? (log!['note'] as String? ?? '') : '');
+
+    // Theme
+    final isPos = (widget.signal['is_positive'] as int? ?? 1) == 1;
+    final colorVal = widget.signal['color_hex'] as int? ?? (isPos ? 0xFF00E676 : 0xFFFF5252);
+    final themeColor = Color(colorVal);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF2C2C2C), // Slightly lighter for nested
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(builder: (context, setSheetState) {
+           return SafeArea(
+             child: Padding(
+               padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+               child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                     Row(
+                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                       children: [
+                         Text(isEditing ? 'Edit Point' : 'Add Point', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                         if (isEditing)
+                           TextButton(
+                             onPressed: () async {
+                                await AppDatabase.deleteSignalLog(log['id']);
+                                Navigator.pop(context);
+                             },
+                             child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                           ),
+                       ],
+                     ),
+                     const SizedBox(height: 20),
+                     
+                     // Time Picker Row
+                     InkWell(
+                       onTap: () async {
+                          final t = await showTimePicker(context: context, initialTime: _time);
+                          if (t != null) setSheetState(() => _time = t);
+                       },
+                       child: Container(
+                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                         decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
+                         child: Row(
+                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                           children: [
+                             const Text('Time', style: TextStyle(color: Colors.white70)),
+                             Text(_time.format(context), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                           ],
+                         ),
+                       ),
+                     ),
+                     const SizedBox(height: 24),
+                     
+                     // Value Slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Low (1)', style: TextStyle(color: Colors.white54)),
+                        Text('$_val', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                        const Text('High (10)', style: TextStyle(color: Colors.white54)),
+                      ],
+                    ),
+                    Slider(
+                      value: _val.toDouble(),
+                      min: 1,
+                      max: 10,
+                      divisions: 9,
+                      activeColor: themeColor,
+                      onChanged: (v) => setSheetState(() => _val = v.toInt()),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: noteController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Note',
+                        labelStyle: TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: Colors.white10,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                     SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          // Construct DateTime
+                          final newDt = DateTime(date.year, date.month, date.day, _time.hour, _time.minute);
+                          final note = noteController.text.trim();
+                          
+                          if (isEditing) {
+                             await AppDatabase.updateSignalLog(log['id'], _val, note.isEmpty ? null : note, newDt);
+                          } else {
+                             await AppDatabase.logSignal(widget.signal['id'], _val, note.isEmpty ? null : note, newDt);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: themeColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          foregroundColor: Colors.black,
+                        ),
+                        child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+               ),
+             ),
+           );
+        });
+      }
+    );
+  }
+} // End class

@@ -25,7 +25,7 @@ class AppDatabase {
     // openDatabase will create the DB file if it doesn't exist.
     _db = await openDatabase(
       path,
-      version: 11,
+      version: 14,
       onCreate: (db, version) async {
         // TABLE: problem
         await db.execute('''
@@ -43,6 +43,7 @@ class AppDatabase {
             created_at INTEGER NOT NULL,
             intensity INTEGER NOT NULL,
             note TEXT,
+            label TEXT,
             FOREIGN KEY (problem_id) REFERENCES problem(id)
           );
         ''');
@@ -126,6 +127,7 @@ class AppDatabase {
           );
         ''');
 
+      
         // TABLE: signal_log
         await db.execute('''
           CREATE TABLE signal_log (
@@ -135,6 +137,20 @@ class AppDatabase {
             created_at INTEGER NOT NULL,
             note TEXT,
             FOREIGN KEY(signal_id) REFERENCES signal_def(id) ON DELETE CASCADE
+          );
+        ''');
+
+        // TABLE: time_block
+        await db.execute('''
+          CREATE TABLE time_block (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            start_h INTEGER NOT NULL,
+            start_m INTEGER NOT NULL,
+            end_h INTEGER NOT NULL,
+            end_m INTEGER NOT NULL,
+            day_of_week INTEGER NOT NULL, -- 1=Monday, 7=Sunday
+            color_hex INTEGER -- Optional color for the block
           );
         ''');
       },
@@ -250,6 +266,39 @@ class AppDatabase {
             );
           ''');
         }
+        if (oldVersion < 12) {
+          await db.execute('''
+            CREATE TABLE time_block (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              start_h INTEGER NOT NULL,
+              start_m INTEGER NOT NULL,
+              end_h INTEGER NOT NULL,
+              end_m INTEGER NOT NULL,
+              day_of_week INTEGER NOT NULL, -- 1=Monday, 7=Sunday
+              color_hex INTEGER -- Optional color for the block
+            );
+          ''');
+        }
+        if (oldVersion < 13) {
+           await db.execute('''
+            CREATE TABLE IF NOT EXISTS time_block (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              start_h INTEGER NOT NULL,
+              start_m INTEGER NOT NULL,
+              end_h INTEGER NOT NULL,
+              end_m INTEGER NOT NULL,
+              day_of_week INTEGER NOT NULL, -- 1=Monday, 7=Sunday
+              color_hex INTEGER -- Optional color for the block
+            );
+          ''');
+        }
+        if (oldVersion < 14) {
+           try {
+             await db.execute('ALTER TABLE snapshot ADD COLUMN label TEXT');
+           } catch (_) {}
+        }
       },
     );
 
@@ -302,6 +351,20 @@ class AppDatabase {
     return days;
   }
 
+  static Future<void> updateSignalLog(int id, int value, String? note, DateTime date) async {
+    final db = await getDb();
+    await db.update('signal_log', {
+      'value': value,
+      'created_at': date.millisecondsSinceEpoch,
+      'note': note,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> deleteSignalLog(int id) async {
+    final db = await getDb();
+    await db.delete('signal_log', where: 'id = ?', whereArgs: [id]);
+  }
+
   static Future<void> logSignal(int signalId, int value, String? note, DateTime date) async {
     final db = await getDb();
     await db.insert('signal_log', {
@@ -334,12 +397,14 @@ class AppDatabase {
     required String title,
     required int intensity,
     String? note,
+    String? label,
     String? timestamp, // Optional: ISO8601 formatted string
   }) async {
     final db = await getDb();
 
     final cleanTitle = title.trim();
     final cleanNote = (note ?? '').trim();
+    final cleanLabel = (label ?? '').trim();
 
     await db.insert(
       'problem',
@@ -374,6 +439,7 @@ class AppDatabase {
       'created_at': createdMs,
       'intensity': intensity,
       'note': cleanNote.isNotEmpty ? cleanNote : null,
+      'label': cleanLabel.isNotEmpty ? cleanLabel : null,
     });
   }
 
@@ -383,11 +449,13 @@ class AppDatabase {
     required String title,
     required int intensity,
     String? note,
+    String? label,
     required String timestamp,
   }) async {
     final db = await getDb();
     final cleanTitle = title.trim();
     final cleanNote = (note ?? '').trim();
+    final cleanLabel = (label ?? '').trim();
 
     // Ensure title exists
     await db.insert(
@@ -416,6 +484,7 @@ class AppDatabase {
         'created_at': createdMs,
         'intensity': intensity,
         'note': cleanNote.isNotEmpty ? cleanNote : null,
+        'label': cleanLabel.isNotEmpty ? cleanLabel : null,
       },
       where: 'id = ?',
       whereArgs: [id],
@@ -444,6 +513,7 @@ class AppDatabase {
         problem.title AS title,
         snapshot.intensity AS intensity,
         snapshot.note AS note,
+        snapshot.label AS label,
         snapshot.created_at AS created_at
       FROM snapshot
       JOIN problem ON problem.id = snapshot.problem_id
@@ -467,6 +537,7 @@ class AppDatabase {
         problem.title,
         snapshot.intensity,
         snapshot.note,
+        snapshot.label,
         snapshot.created_at
       FROM snapshot
       JOIN problem ON problem.id = snapshot.problem_id
@@ -481,6 +552,7 @@ class AppDatabase {
         title: row['title'] as String,
         intensity: row['intensity'] as int,
         note: row['note'] as String?,
+        label: row['label'] as String?,
         timestamp: DateTime.fromMillisecondsSinceEpoch(ms).toIso8601String(),
       );
     }).toList();
@@ -902,6 +974,88 @@ class AppDatabase {
     }, where: 'id = ?', whereArgs: [id]);
   }
 
+  // ---------------------------------------------------------------------------
+  // TIME BLOCKING
+  // ---------------------------------------------------------------------------
+
+  static Future<int> createTimeBlock({
+    required String name,
+    required int startH,
+    required int startM,
+    required int endH,
+    required int endM,
+    required int dayOfWeek,
+    int? colorHex,
+  }) async {
+    final db = await getDb();
+    return db.insert('time_block', {
+      'name': name,
+      'start_h': startH,
+      'start_m': startM,
+      'end_h': endH,
+      'end_m': endM,
+      'day_of_week': dayOfWeek,
+      'color_hex': colorHex,
+    });
+  }
+
+  static Future<List<TimeBlock>> getTimeBlocksForDay(int dayOfWeek) async {
+    final db = await getDb();
+    final rows = await db.query(
+      'time_block',
+      where: 'day_of_week = ?',
+      whereArgs: [dayOfWeek],
+      orderBy: 'start_h ASC, start_m ASC',
+    );
+    return rows.map((e) => TimeBlock.fromMap(e)).toList();
+  }
+
+  static Future<void> updateTimeBlock({
+    required int id,
+    required String name,
+    required int startH,
+    required int startM,
+    required int endH,
+    required int endM,
+    required int dayOfWeek,
+    int? colorHex,
+  }) async {
+    final db = await getDb();
+    await db.update('time_block', {
+      'name': name,
+      'start_h': startH,
+      'start_m': startM,
+      'end_h': endH,
+      'end_m': endM,
+      'day_of_week': dayOfWeek,
+      'color_hex': colorHex,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> deleteTimeBlock(int id) async {
+    final db = await getDb();
+    await db.delete('time_block', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> copyDayBlocks(int sourceDay, int targetDay) async {
+    final db = await getDb();
+    await db.transaction((txn) async {
+      await txn.delete('time_block', where: 'day_of_week = ?', whereArgs: [targetDay]);
+      final sourceBlocks = await txn.query('time_block', where: 'day_of_week = ?', whereArgs: [sourceDay]);
+      for (var block in sourceBlocks) {
+        await txn.insert('time_block', {
+          'name': block['name'],
+          'start_h': block['start_h'],
+          'start_m': block['start_m'],
+          'end_h': block['end_h'],
+          'end_m': block['end_m'],
+          'day_of_week': targetDay,
+          'color_hex': block['color_hex'],
+        });
+      }
+    });
+  }
+
   static Future<void> seedDebugData() async {
     final db = await getDb();
     
@@ -988,6 +1142,7 @@ class MoodSnapshot {
   final String title;
   final int intensity;
   final String? note;
+  final String? label;
   final String timestamp;
 
   MoodSnapshot({
@@ -995,6 +1150,42 @@ class MoodSnapshot {
     required this.title,
     required this.intensity,
     this.note,
+    this.label,
     required this.timestamp,
   });
+}
+
+class TimeBlock {
+  final int id;
+  final String name;
+  final int startH;
+  final int startM;
+  final int endH;
+  final int endM;
+  final int dayOfWeek;
+  final int? colorHex;
+
+  TimeBlock({
+    required this.id,
+    required this.name,
+    required this.startH,
+    required this.startM,
+    required this.endH,
+    required this.endM,
+    required this.dayOfWeek,
+    this.colorHex,
+  });
+
+  factory TimeBlock.fromMap(Map<String, dynamic> map) {
+    return TimeBlock(
+      id: map['id'] as int,
+      name: map['name'] as String,
+      startH: map['start_h'] as int,
+      startM: map['start_m'] as int,
+      endH: map['end_h'] as int,
+      endM: map['end_m'] as int,
+      dayOfWeek: map['day_of_week'] as int,
+      colorHex: map['color_hex'] as int?,
+    );
+  }
 }

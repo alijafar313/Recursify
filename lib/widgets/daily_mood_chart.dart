@@ -17,7 +17,12 @@ class DailyMoodChart extends StatelessWidget {
     this.wakeTime,
     this.sleepTime,
     this.isOverride = false,
+    this.onPointTap,
+    this.onChartTap,
   });
+
+  final Function(MoodSnapshot)? onPointTap;
+  final VoidCallback? onChartTap;
 
   @override
   Widget build(BuildContext context) {
@@ -257,17 +262,31 @@ class DailyMoodChart extends StatelessWidget {
             }).toList(),
             
             lineTouchData: LineTouchData(
-              enabled: false,
+              enabled: true,
+              handleBuiltInTouches: false,
+              touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
+                if (event is FlTapUpEvent) {
+                   if (response != null && response.lineBarSpots != null && response.lineBarSpots!.isNotEmpty) {
+                      // Tap on a point -> Edit
+                      final spotIndex = response.lineBarSpots!.first.spotIndex;
+                      final snapshot = sorted[spotIndex];
+                      onPointTap?.call(snapshot);
+                   } else {
+                      // Tap on background -> Day Detail
+                      onChartTap?.call();
+                   }
+                }
+              },
               touchTooltipData: LineTouchTooltipData(
                 getTooltipColor: (_) => Colors.transparent, // Transparent background
                 tooltipPadding: EdgeInsets.zero,
-                tooltipMargin: 5,
+                tooltipMargin: 14, // Adjusted to be midway between 5 and 24
                 getTooltipItems: (List<LineBarSpot> touchedSpots) {
                   return touchedSpots.map((touchedSpot) {
                     final index = spots.indexOf(touchedSpot);
                     if (index == -1) return null;
                     return LineTooltipItem(
-                      sorted[index].title,
+                      sorted[index].label ?? sorted[index].title,
                       const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

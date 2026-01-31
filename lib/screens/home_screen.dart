@@ -358,6 +358,19 @@ class _DayCardState extends State<_DayCard> {
                       wakeTime: widget.wakeTime,
                       sleepTime: widget.sleepTime,
                       isOverride: widget.isOverride,
+                      onChartTap: widget.onTap,
+                      onPointTap: (s) async {
+                         // Edit the snapshot
+                         final changed = await Navigator.push(
+                           context,
+                           MaterialPageRoute(
+                             builder: (_) => AddSnapshotScreen(existingSnapshot: s),
+                           ),
+                         );
+                         if (changed == true) {
+                           _load();
+                         }
+                      },
                     );
                   },
                 ),
