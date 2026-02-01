@@ -146,11 +146,14 @@ class GenericChart extends StatelessWidget {
 
              gridData: FlGridData(
                 show: true,
-                drawVerticalLine: false,
+                drawVerticalLine: true,
+                verticalInterval: (finalMaxX - finalMinX) > 12 ? 6 : 1, // Dynamic vertical
                 horizontalInterval: 1, 
+                getDrawingVerticalLine: (value) {
+                   return FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1);
+                },
                 getDrawingHorizontalLine: (value) {
-                  // Only grid lines for integer values? 
-                  return const FlLine(color: Colors.transparent); // Hide all for sleek look
+                  return FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1);
                 },
              ),
 

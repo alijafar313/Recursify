@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
 import '../data/app_database.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'trash_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,8 +13,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // TODO: Update this email address before release
+  static const String kSupportEmail = 'support@moodly.app'; 
+
   bool _notificationsEnabled = false;
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
+
   TimeOfDay _endTime = const TimeOfDay(hour: 21, minute: 0);
   int _intervalHours = 2;
 
@@ -96,6 +101,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _sendEmail(BuildContext context, String category) async {
+    Navigator.pop(context); // Close sheet
+    
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: kSupportEmail, 
+      query: 'subject=[Moodly] $category&body=Hi there, I have some feedback regarding $category...',
+    );
+
+    try {
+      if (await canLaunchUrl(emailLaunchUri)) {
+        await launchUrl(emailLaunchUri);
+      } else {
+        if (context.mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open email client.')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error launching email: $e');
+    }
+  }
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -231,6 +259,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           */
+          const Divider(),
+           ListTile(
+            leading: const Icon(Icons.feedback_outlined),
+            title: const Text('Send Suggestions'),
+            subtitle: const Text('Advice, requests, or feedback'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (ctx) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Padding(
+                         padding: EdgeInsets.all(16.0),
+                         child: Text('What would you like to send?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.extension),
+                        title: const Text('Special Sections Request'),
+                        onTap: () => _sendEmail(ctx, 'Special Sections Request'),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.lightbulb),
+                        title: const Text('Advice'),
+                        onTap: () => _sendEmail(ctx, 'Advice'),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.thumb_up),
+                        title: const Text('Suggestions'),
+                        onTap: () => _sendEmail(ctx, 'Suggestions'),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.comment),
+                        title: const Text('Other'),
+                        onTap: () => _sendEmail(ctx, 'Other'),
+                      ),
+                      const SizedBox(height: 48),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.delete_outline),

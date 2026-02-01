@@ -25,7 +25,7 @@ class AppDatabase {
     // openDatabase will create the DB file if it doesn't exist.
     _db = await openDatabase(
       path,
-      version: 14,
+      version: 16,
       onCreate: (db, version) async {
         // TABLE: problem
         await db.execute('''
@@ -176,6 +176,22 @@ class AppDatabase {
             );
           ''');
         }
+        // ... (existing upgrades)
+        
+        if (oldVersion < 15) {
+           await db.execute('''
+            CREATE TABLE habit (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              frequency_days INTEGER NOT NULL, -- e.g. 1 means daily, 7 means weekly
+              time_h INTEGER NOT NULL,
+              time_m INTEGER NOT NULL,
+              notifications_enabled INTEGER DEFAULT 0,
+              created_at INTEGER NOT NULL,
+              deleted_at INTEGER
+            );
+          ''');
+        }
         if (oldVersion < 4) {
           await db.execute('''
             CREATE TABLE observation (
@@ -298,6 +314,30 @@ class AppDatabase {
            try {
              await db.execute('ALTER TABLE snapshot ADD COLUMN label TEXT');
            } catch (_) {}
+        }
+        if (oldVersion < 16) {
+           // Ensure habit table exists if skipped (fallback)
+           try {
+              await db.execute('''
+                CREATE TABLE IF NOT EXISTS habit (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  frequency_days INTEGER NOT NULL,
+                  time_h INTEGER NOT NULL,
+                  time_m INTEGER NOT NULL,
+                  notifications_enabled INTEGER DEFAULT 0,
+                  created_at INTEGER NOT NULL,
+                  deleted_at INTEGER
+                );
+              ''');
+           } catch (_) {}
+
+          try { await db.execute("ALTER TABLE habit ADD COLUMN repeat_value INTEGER DEFAULT 1"); } catch (_) {}
+          try { await db.execute("ALTER TABLE habit ADD COLUMN repeat_unit TEXT DEFAULT 'day'"); } catch (_) {}
+          try { await db.execute("ALTER TABLE habit ADD COLUMN week_days TEXT"); } catch (_) {}
+          try { await db.execute("ALTER TABLE habit ADD COLUMN start_date INTEGER"); } catch (_) {}
+          try { await db.execute("ALTER TABLE habit ADD COLUMN end_type TEXT DEFAULT 'never'"); } catch (_) {}
+          try { await db.execute("ALTER TABLE habit ADD COLUMN end_value INTEGER"); } catch (_) {}
         }
       },
     );
@@ -803,6 +843,108 @@ class AppDatabase {
     );
   }
 
+  static Future<void> deleteObservation(int id) async {
+    final db = await getDb();
+    await db.update('observation', {
+      'deleted_at': DateTime.now().millisecondsSinceEpoch
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // OBSERVATION (End)
+  // ---------------------------------------------------------------------------
+  
+  // ---------------------------------------------------------------------------
+  // HABITS
+  // ---------------------------------------------------------------------------
+
+  static Future<void> insertHabit({
+    required String name,
+    required int frequencyDays,
+    required int timeH,
+    required int timeM,
+    required bool notificationsEnabled,
+    int repeatValue = 1,
+    String repeatUnit = 'day',
+    String? weekDays,
+    int? startDate,
+    String endType = 'never',
+    int? endValue,
+  }) async {
+    final db = await getDb();
+    await db.insert('habit', {
+      'name': name,
+      'frequency_days': frequencyDays,
+      'time_h': timeH,
+      'time_m': timeM,
+      'notifications_enabled': notificationsEnabled ? 1 : 0,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+      'repeat_value': repeatValue,
+      'repeat_unit': repeatUnit,
+      'week_days': weekDays,
+      'start_date': startDate ?? DateTime.now().millisecondsSinceEpoch,
+      'end_type': endType,
+      'end_value': endValue,
+    });
+  }
+
+  static Future<void> updateHabit({
+    required int id,
+    required String name,
+    required int frequencyDays,
+    required int timeH,
+    required int timeM,
+    required bool notificationsEnabled,
+    int repeatValue = 1,
+    String repeatUnit = 'day',
+    String? weekDays,
+    int? startDate,
+    String endType = 'never',
+    int? endValue,
+  }) async {
+    final db = await getDb();
+    await db.update('habit', {
+      'name': name,
+      'frequency_days': frequencyDays,
+      'time_h': timeH,
+      'time_m': timeM,
+      'notifications_enabled': notificationsEnabled ? 1 : 0,
+      'repeat_value': repeatValue,
+      'repeat_unit': repeatUnit,
+      'week_days': weekDays,
+      'start_date': startDate,
+      'end_type': endType,
+      'end_value': endValue,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> deleteHabit(int id) async {
+    final db = await getDb();
+    await db.update('habit', {
+      'deleted_at': DateTime.now().millisecondsSinceEpoch
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+  
+  static Future<void> restoreHabit(int id) async {
+    final db = await getDb();
+    await db.update('habit', {
+      'deleted_at': null
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+  
+  static Future<void> hardDeleteHabit(int id) async {
+    final db = await getDb();
+    await db.delete('habit', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<List<Map<String, dynamic>>> getHabits({bool includeDeleted = false}) async {
+    final db = await getDb();
+    if (includeDeleted) {
+       return db.query('habit', where: 'deleted_at IS NOT NULL', orderBy: 'created_at DESC');
+    }
+    return db.query('habit', where: 'deleted_at IS NULL', orderBy: 'created_at DESC');
+  }
+
   static Future<List<Map<String, Object?>>> getObservations() async {
     final db = await getDb();
     return db.query(
@@ -812,15 +954,7 @@ class AppDatabase {
     );
   }
 
-  static Future<void> deleteObservation(int id) async { // Soft Delete
-    final db = await getDb();
-    await db.update(
-      'observation', 
-      {'deleted_at': DateTime.now().millisecondsSinceEpoch},
-      where: 'id = ?',
-      whereArgs: [id]
-    );
-  }
+
 
   static Future<void> restoreObservation(int id) async {
     final db = await getDb();

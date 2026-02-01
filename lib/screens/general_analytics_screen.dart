@@ -320,11 +320,15 @@ class _GeneralAnalyticsScreenState extends State<GeneralAnalyticsScreen> {
           maxY: maxY,
           gridData: FlGridData(
             show: true,
-            drawVerticalLine: false,
-            horizontalInterval: 1,
+            drawVerticalLine: true,
+            verticalInterval: maxX > 10 ? 6 : 1, // 6h for daily, 1d for weekly
+            horizontalInterval: 2,
+            getDrawingVerticalLine: (value) {
+               return FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1);
+            },
             getDrawingHorizontalLine: (value) {
                if (value == 0) return const FlLine(color: Colors.white24, strokeWidth: 1);
-               return const FlLine(color: Colors.transparent);
+               return FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1);
             },
           ),
           titlesData: FlTitlesData(

@@ -346,13 +346,23 @@ class DailyMoodChart extends StatelessWidget {
 
             gridData: FlGridData(
               show: true,
-              drawVerticalLine: false,
-              horizontalInterval: 1, 
+              drawVerticalLine: true,
+              verticalInterval: 3, // More dense: Every 3 hours
+              horizontalInterval: 1, // Every single unit (-5, -4, ... 5)
+              getDrawingVerticalLine: (value) {
+                return FlLine(
+                  color: Colors.white.withOpacity(0.05),
+                  strokeWidth: 1,
+                );
+              },
               getDrawingHorizontalLine: (value) {
                 if (value == 0) {
-                  return const FlLine(color: Colors.white24, strokeWidth: 1); // Subtle zero line
+                  return const FlLine(color: Colors.white24, strokeWidth: 1); // Distinct zero line
                 }
-                return const FlLine(color: Colors.transparent); // Hide others
+                return FlLine(
+                  color: Colors.white.withOpacity(0.05),
+                  strokeWidth: 1,
+                );
               },
             ),
 
