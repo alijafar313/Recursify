@@ -204,25 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          if (_notificationsEnabled)
-            const Card(
-              color: Colors.amberAccent,
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        'Tip: You can "Reply" to the notification with just a number (1-10) to log quickly without opening the app!',
-                        style: TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+
 /*
           const Divider(),
           const Padding(
@@ -351,7 +333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () async {
               await NotificationService().triggerNotification(
                 title: 'How are you feeling?',
-                body: 'Tap "Quick Log" to enter -5 to 5',
+                body: 'Time to log your mood!',
               );
               
               if (mounted) {

@@ -24,7 +24,7 @@ class _AIScreenState extends State<AIScreen> {
 
   Future<void> _loadKey() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = prefs.getString('gemini_api_key');
+    final key = prefs.getString('openai_api_key');
     if (key != null && key.isNotEmpty) {
       _apiKeyController.text = key;
       setState(() => _hasKey = true);
@@ -36,11 +36,11 @@ class _AIScreenState extends State<AIScreen> {
     if (key.isEmpty) return;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', key);
+    await prefs.setString('openai_api_key', key);
     setState(() => _hasKey = true);
     
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('API Key Saved!')),
+      const SnackBar(content: Text('OpenAI API Key Saved!')),
     );
   }
 
@@ -60,7 +60,7 @@ class _AIScreenState extends State<AIScreen> {
 
     try {
       final service = AIService(key);
-      final analysis = await service.analyzeMoods();
+      final analysis = await service.analyzeData();
       if (!mounted) return;
       setState(() {
         _result = analysis;
@@ -81,7 +81,7 @@ class _AIScreenState extends State<AIScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Insights (Gemini)'),
+        title: const Text('AI Insights (GPT)'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -98,7 +98,7 @@ class _AIScreenState extends State<AIScreen> {
             children: [
               if (!_hasKey)
                 Card(
-                  color: Colors.blue.shade50,
+                  color: Colors.blue.shade900,
                   margin: const EdgeInsets.only(bottom: 16),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -106,18 +106,20 @@ class _AIScreenState extends State<AIScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Setup Gemini API',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          'Setup OpenAI API',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                         ),
                         const SizedBox(height: 8),
-                        const Text('Get a free key from aistudio.google.com'),
+                        const Text('Get a key from platform.openai.com', style: TextStyle(color: Colors.white70)),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _apiKeyController,
                           decoration: const InputDecoration(
-                            labelText: 'Paste API Key Here',
+                            labelText: 'Paste sk-... Key Here',
                             border: OutlineInputBorder(),
                             isDense: true,
+                            fillColor: Colors.white,
+                            filled: true,
                           ),
                           obscureText: true,
                         ),
@@ -137,7 +139,7 @@ class _AIScreenState extends State<AIScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.psychology, size: 64, color: Colors.indigo),
+                        const Icon(Icons.psychology, size: 64, color: Colors.greenAccent),
                         const SizedBox(height: 16),
                         const Text(
                           'Ready to analyze your patterns.',
@@ -147,7 +149,7 @@ class _AIScreenState extends State<AIScreen> {
                         ElevatedButton.icon(
                           onPressed: _analyze,
                           icon: const Icon(Icons.auto_awesome),
-                          label: const Text('Analyze My Week'),
+                          label: const Text('Analyze My Data'),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 32,
@@ -166,9 +168,9 @@ class _AIScreenState extends State<AIScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(),
+                        CircularProgressIndicator(color: Colors.greenAccent),
                         SizedBox(height: 16),
-                        Text('Gemini is thinking...'),
+                        Text('Thinking...'),
                       ],
                     ),
                   ),
