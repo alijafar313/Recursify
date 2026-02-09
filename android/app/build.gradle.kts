@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -7,7 +10,7 @@ plugins {
 
 android {
     ndkVersion = "27.0.12077973"
-    namespace = "com.example.moodly"
+    namespace = "com.recursify.app"
     compileSdk = flutter.compileSdkVersion
     //ndkVersion = flutter.ndkVersion
 
@@ -27,7 +30,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.moodly"
+        applicationId = "com.recursify.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -36,10 +39,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val keyPropertiesFile = rootProject.file("key.properties")
+            if (keyPropertiesFile.exists()) {
+                val props = Properties()
+                props.load(FileInputStream(keyPropertiesFile))
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
             signingConfig = signingConfigs.getByName("debug")
         }
     }

@@ -53,7 +53,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Moodly'),
+        title: const Text('Recursify'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),

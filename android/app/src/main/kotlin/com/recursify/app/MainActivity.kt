@@ -1,4 +1,4 @@
-package com.example.moodly
+package com.recursify.app
 
 import io.flutter.embedding.android.FlutterActivity
 
