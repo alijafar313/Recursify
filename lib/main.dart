@@ -15,14 +15,14 @@ void main() async {
   );
   await MobileAds.instance.initialize();
   await NotificationService().init();
-  runApp(const MoodlyApp());
+  runApp(const RecursifyApp());
 }
 
 // ============================================================
 // Top-level app widget
 // ============================================================
-class MoodlyApp extends StatelessWidget {
-  const MoodlyApp({super.key});
+class RecursifyApp extends StatelessWidget {
+  const RecursifyApp({super.key});
 
   @override
   Widget build(BuildContext context) {

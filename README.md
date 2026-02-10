@@ -1,6 +1,14 @@
-# moodly
-
-A new Flutter project.
+# Recursify: AI Mood & Habit Tracker
+ 
+Recursify is an advanced emotional wellness tracker that helps you spot hidden patterns in your life. By logging your daily moods, sleep quality, and custom habits ("Signals"), you gain a clear picture of what drives your well-being.
+ 
+**Key Features:**
+*   **Smart Mood Logging:** Track intensity (-5 to +5), context tags, and personal notes.
+*   **AI Analysis (GPT-5.2):** Unlock deep insights!
+*   **Custom Habit Tracking:** Create your own "Signals".
+*   **Sleep Monitoring:** Log duration and quality.
+*   **Visual Analytics:** Interactive charts show your emotional trends.
+*   **Private by Design:** Local-first, secure AI.
 
 ## Getting Started
 
