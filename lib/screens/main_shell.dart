@@ -10,6 +10,7 @@ import 'time_block_screen.dart';
 import 'settings_screen.dart';
 import '../services/amplification_service.dart';
 import '../services/notification_service.dart';
+import '../widgets/ad_banner.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -68,9 +69,17 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Column(
+        children: [
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _screens,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const AdBanner(), // Persistent Banner Ad
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,

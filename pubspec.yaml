@@ -45,6 +45,9 @@ dependencies:
   intl: ^0.20.2
   url_launcher: ^6.3.2
   http: ^1.6.0
+  google_mobile_ads: ^6.0.0
+  firebase_core: ^4.4.0
+  cloud_functions: ^6.0.6
   # vector_math: ^2.2.0 (removed, moved to overrides)
 
 dependency_overrides:

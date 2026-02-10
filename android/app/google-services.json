@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "502975992844",
+    "project_id": "x001-f33de",
+    "storage_bucket": "x001-f33de.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:502975992844:android:a3b459b52b74849f12ca29",
+        "android_client_info": {
+          "package_name": "com.recursify.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgBwuZFEN_rfXL95ko8AACzFgUWS95mCw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,11 +1,9 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:cloud_functions/cloud_functions.dart';
 import '../data/app_database.dart';
 
 class AIService {
-  final String apiKey;
-
-  AIService(this.apiKey);
+  // No API key needed here anymore! It's safe on the server.
+  AIService();
 
   Future<String> analyzeData() async {
     // 1. Fetch Data (Last 14 days)
@@ -66,74 +64,59 @@ class AIService {
       return "You haven't logged enough data yet. Please add some moods, trackers, or observations first!";
     }
 
-    // 2. Construct Prompt
-    final StringBuffer prompt = StringBuffer();
-    prompt.writeln("You are an emotional wellness coach. Analyze the following user data to find patterns between sleep, context, habits (signals), and mood.");
-    prompt.writeln("Provide a daily summary and identify triggers (positive 'Boosters' and negative 'Drainers').");
-    prompt.writeln("Also note any trends in the user's observations.");
-    prompt.writeln("Be concise, friendly, and use bullet points.");
-    
-    prompt.writeln("\n--- SLEEP HISTORY (Last 2 weeks) ---");
+    // 2. Prepare Data Strings
+    final StringBuffer sleepStr = StringBuffer();
     for (var log in sleepLogs) {
       final hours = (log['duration_hours'] as double).toStringAsFixed(1);
       final quality = log['quality'] != null ? ", Quality: ${log['quality']}/5" : "";
-      prompt.writeln("- ${log['wake_day']}: Slept $hours hours$quality");
+      sleepStr.writeln("- ${log['wake_day']}: Slept $hours hours$quality");
     }
 
-    prompt.writeln("\n--- HABITS / TRACKERS (Last 50 entries) ---");
+    final StringBuffer habitStr = StringBuffer();
     for (var log in signalLogs) {
       final name = signalNames[log['signal_id']] ?? 'Unknown';
       final val = log['value'];
       final day = log['day'];
       final noteVal = log['note'];
-      final noteText = noteVal != null ? " ($noteVal)" : ""; // e.g. " (Low energy)"
-      prompt.writeln("- $day: $name = $val$noteText");
+      final noteText = noteVal != null ? " ($noteVal)" : "";
+      habitStr.writeln("- $day: $name = $val$noteText");
     }
 
-    prompt.writeln("\n--- OBSERVATIONS (Last 10) ---");
+    final StringBuffer obsStr = StringBuffer();
     for (var obs in observations) {
       final content = obs['content'];
-      prompt.writeln("- $content");
+      obsStr.writeln("- $content");
     }
 
-    prompt.writeln("\n--- MOOD HISTORY (Last 100 entries) ---");
+    final StringBuffer moodStr = StringBuffer();
     for (var snap in snapshots) {
       final day = snap['day'];
       final time = snap['time'];
       final mood = snap['intensity'];
       final context = snap['context'];
       final note = snap['note'] ?? '';
-      prompt.writeln("- $day at $time: Mood $mood/10. Context: $context. Note: $note");
+      moodStr.writeln("- $day at $time: Mood $mood/10. Context: $context. Note: $note");
     }
     
-    prompt.writeln("\nPlease analyze this data:");
-
-    // 3. Call OpenAI
+    // 3. Call Firebase Cloud Function
     try {
-      final response = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'gpt-4o-mini',
-          'messages': [
-            {'role': 'system', 'content': 'You are a helpful, empathetic data analyst for a mental health app.'},
-            {'role': 'user', 'content': prompt.toString()},
-          ],
-          'temperature': 0.7,
-        }),
-      );
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('analyzeMood');
+      
+      final result = await callable.call({
+        'moodHistory': moodStr.toString(),
+        'sleepHistory': sleepStr.toString(),
+        'habits': habitStr.toString(),
+        'observations': obsStr.toString(),
+      });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        return data['choices'][0]['message']['content'] as String;
-      } else {
-        return "Error from OpenAI (${response.statusCode}): ${response.body}";
-      }
+      final data = result.data as Map<String, dynamic>;
+      return data['result'] as String;
+
+    } on FirebaseFunctionsException catch (e) {
+      return "AI Error: ${e.message} (Code: ${e.code})";
     } catch (e) {
-      return "Error connecting to AI: $e\n\nPlease check your Internet and API Key.";
+      return "Error connecting to AI: $e\n\nPlease check your Internet.";
     }
   }
 }
