@@ -34,7 +34,7 @@ exports.analyzeMood = onCall({
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-5.2",
       messages: [
         { role: "system", content: "You are a helpful, empathetic data analyst for a mental health app." },
         { role: "user", content: prompt },
